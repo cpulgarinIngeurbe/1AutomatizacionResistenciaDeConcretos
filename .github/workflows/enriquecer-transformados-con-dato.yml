@@ -1,0 +1,160 @@
+# Última actualización: 2026-06-09
+name: 📊 Enriquecer Transformados con Campo Dato
+
+on:
+  workflow_dispatch:
+
+jobs:
+  enriquecer-transformados:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Instalar dependencias
+        run: |
+          pip install pandas openpyxl
+
+      - name: 📈 Hacer join de Datos Teóricos con Transformados
+        run: |
+          python << 'EOF'
+          import pandas as pd
+          import numpy as np
+          from openpyxl import load_workbook
+          from openpyxl.styles import PatternFill, Font
+
+          # Leer archivo teórico
+          print('[*] Leyendo archivo de Consolidado Teóricas')
+          df_teoricas = pd.read_excel("ConsolidadoResistenciaTeoricas.xlsx")
+          print(f'[+] Cargado. Forma: {df_teoricas.shape}')
+          print(f'[+] Columnas: {list(df_teoricas.columns)}')
+
+          # Normalizar resistencia a enteros
+          df_teoricas['Resistencia_int'] = df_teoricas['Resistencia nominal (MPa)'].astype(int)
+
+          # Crear clave de join
+          df_teoricas['join_key'] = (df_teoricas['Proyecto'].astype(str) + '|' +
+                                      df_teoricas['TIPO'].astype(str) + '|' +
+                                      df_teoricas['Resistencia_int'].astype(str) + '|' +
+                                      df_teoricas['Edad'].astype(str))
+
+          print(f'[+] Columna de join_key creada en Teóricas')
+
+          # Archivos a enriquecer
+          archivos_transformados = [
+              "DatosTransformados/ConsolidadoResistenciasConcretos.xlsx",
+              "DatosTransformados/VIALE_SGS.xlsx"
+          ]
+
+          for archivo_transformado in archivos_transformados:
+              print(f'\n[*] Procesando: {archivo_transformado}')
+
+              # Leer archivo transformado
+              df_transformado = pd.read_excel(archivo_transformado)
+              print(f'[+] Cargado. Forma: {df_transformado.shape}')
+
+              # Obtener nombre correcto de columna de edad
+              edad_col = [col for col in df_transformado.columns if 'Edad' in col][0]
+
+              # Normalizar resistencia a enteros
+              df_transformado['Resistencia_int'] = df_transformado['Resistencia nominal (MPa)'].astype(int)
+
+              # Crear clave de join
+              df_transformado['join_key'] = (df_transformado['Proyecto'].astype(str) + '|' +
+                                            df_transformado['TIPO'].astype(str) + '|' +
+                                            df_transformado['Resistencia_int'].astype(str) + '|' +
+                                            df_transformado[edad_col].astype(str))
+
+              print(f'[+] Columna de join_key creada')
+
+              # Crear diccionario de lookup para join_key -> Dato
+              lookup_dato = dict(zip(df_teoricas['join_key'], df_teoricas['Dato']))
+
+              # Agregar columna Dato con join exacto
+              df_transformado['Dato'] = df_transformado['join_key'].map(lookup_dato)
+
+              # Contar coincidencias
+              coincidencias = df_transformado['Dato'].notna().sum()
+              total = len(df_transformado)
+              print(f'[+] Coincidencias encontradas: {coincidencias}/{total}')
+
+              # Limpiar columnas temporales
+              df_transformado = df_transformado.drop(columns=['Resistencia_int', 'join_key'])
+
+              # Guardar archivo
+              df_transformado.to_excel(archivo_transformado, index=False)
+              print(f'[+] Archivo guardado con columna Dato')
+
+              # Aplicar formateo
+              print(f'[+] Aplicando formateo')
+              wb = load_workbook(archivo_transformado)
+              ws = wb.active
+
+              # Obtener índice de columna Dato
+              col_dato_idx = None
+              for col_num, col_letter in enumerate(ws.columns, 1):
+                  if ws.cell(1, col_num).value == 'Dato':
+                      col_dato_idx = col_num
+                      break
+
+              if col_dato_idx:
+                  # Colores
+                  azul_claro = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+                  azul_militar = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
+                  blanco = Font(color="FFFFFF")
+
+                  # Colorear encabezado
+                  celda_header = ws.cell(1, col_dato_idx)
+                  celda_header.fill = azul_militar
+                  celda_header.font = blanco
+
+                  # Colorear datos con valor
+                  for row in range(2, ws.max_row + 1):
+                      celda = ws.cell(row, col_dato_idx)
+                      if celda.value is not None:
+                          celda.fill = azul_claro
+
+              wb.save(archivo_transformado)
+              print(f'[+] Formateo completado')
+
+          print(f'\n[+] Procesamiento completado')
+
+          EOF
+
+      - name: 🔧 Configurar Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action Bot"
+
+      - name: 🤖 Commit y Push
+        env:
+          RESISTENCIA_CONCRETOS_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+        run: |
+          git add DatosTransformados/
+
+          if git diff --quiet --cached; then
+            echo "[*] Sin cambios nuevos"
+          else
+            git commit -m "[AUTO] Enriquecimiento con campo Dato - $(date '+%Y-%m-%d %H:%M:%S')"
+            git push origin main
+            echo "[+] Push completado"
+          fi
+
+      - name: 📊 Reporte final
+        if: always()
+        run: |
+          echo "=== ENRIQUECIMIENTO COMPLETADO ==="
+          echo ""
+          echo "📄 Archivos actualizados:"
+          ls -lh DatosTransformados/*.xlsx 2>/dev/null || echo "No encontrados"
+          echo ""
+          echo "Últimos commits:"
+          git log --oneline -3
