@@ -1,0 +1,118 @@
+# Última actualización: 2026-06-09 16:49:15
+name: 📊 Enriquecer Consolidado Teóricas - Agregar PK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  enriquecer-consolidado:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Instalar dependencias
+        run: |
+          pip install pandas openpyxl
+
+      - name: 📈 Agregar columna PK al Consolidado Teóricas
+        run: |
+          python << 'EOF'
+          import pandas as pd
+          from openpyxl import load_workbook
+          from openpyxl.styles import PatternFill, Font
+
+          # Ruta del archivo
+          ruta_archivo = "ConsolidadoResistenciaTeoricas.xlsx"
+
+          print(f'[*] Leyendo archivo: {ruta_archivo}')
+          df = pd.read_excel(ruta_archivo)
+          print(f'[+] Archivo cargado. Forma: {df.shape}')
+          print(f'[+] Columnas: {list(df.columns)}')
+
+          # Crear columna PK (concatenación)
+          df['PK'] = df['Proyecto'].astype(str) + '_' + df['TIPO'].astype(str) + '_' + df['ResistenciaNominal'].astype(str) + '_' + df['Edad'].astype(str)
+          print(f'[+] Columna PK agregada')
+
+          # Guardar archivo
+          df.to_excel(ruta_archivo, index=False)
+          print(f'[+] Archivo guardado con columna PK')
+
+          # FORMATEO CON COLORES
+          print(f'[+] Aplicando formateo')
+
+          # Cargar workbook
+          wb = load_workbook(ruta_archivo)
+          ws = wb.active
+
+          # Obtener índices de columnas
+          col_pk = df.columns.get_loc('PK') + 1
+          columnas_datos = ['Proyecto', 'TIPO', 'ResistenciaNominal', 'Edad']
+          col_datos = [df.columns.get_loc(col) + 1 for col in columnas_datos if col in df.columns]
+
+          # Colores
+          verde_claro = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+          azul_claro = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+          azul_militar = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
+          blanco = Font(color="FFFFFF")
+
+          # Iterar filas
+          for row in range(2, ws.max_row + 1):
+              # Colorear columnas de datos en verde claro
+              for col_idx in col_datos:
+                  celda = ws.cell(row, col_idx)
+                  celda.fill = verde_claro
+
+              # Colorear PK en azul claro
+              celda_pk = ws.cell(row, col_pk)
+              celda_pk.fill = azul_claro
+
+          # Colorear encabezados
+          for col_idx in range(1, ws.max_column + 1):
+              celda_header = ws.cell(1, col_idx)
+              celda_header.fill = azul_militar
+              celda_header.font = blanco
+
+          # Guardar
+          wb.save(ruta_archivo)
+          print(f'[+] ✓ Consolidado Teóricas enriquecido y formateado')
+
+          EOF
+
+      - name: 🔧 Configurar Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action Bot"
+
+      - name: 🤖 Commit y Push
+        env:
+          RESISTENCIA_CONCRETOS_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+        run: |
+          git add ConsolidadoResistenciaTeoricas.xlsx
+
+          if git diff --quiet --cached; then
+            echo "[*] Sin cambios nuevos"
+          else
+            git commit -m "[AUTO] Enriquecimiento Consolidado Teóricas - $(date '+%Y-%m-%d %H:%M:%S')"
+            git push origin main
+            echo "[+] ✓ Push completado"
+          fi
+
+      - name: 📊 Reporte final
+        if: always()
+        run: |
+          echo "=== ENRIQUECIMIENTO COMPLETADO ==="
+          echo ""
+          echo "📄 Archivo actualizado:"
+          ls -lh ConsolidadoResistenciaTeoricas.xlsx 2>/dev/null || echo "No encontrado"
+          echo ""
+          echo "Últimos commits:"
+          git log --oneline -3
