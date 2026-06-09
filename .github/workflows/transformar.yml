@@ -1,0 +1,455 @@
+# Última actualización: 2026-06-09 16:46:30
+name: 📊 Transformar Datos - Concrelab + SGS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  transformar-datos:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Instalar dependencias
+        run: |
+          pip install pandas openpyxl
+
+      - name: 📁 Crear carpeta DatosTransformados
+        run: |
+          mkdir -p DatosTransformados
+          echo "[+] ✓ Carpeta DatosTransformados creada"
+
+      - name: 🗑️ Limpiar DatosTransformados
+        run: |
+          rm -rf DatosTransformados/*.xlsx
+          echo "[+] ✓ DatosTransformados limpiada"
+
+      - name: 📈 Transformar archivos
+        run: |
+          python << 'EOF'
+          import pandas as pd
+          import os
+          import shutil
+          from openpyxl import load_workbook
+          from openpyxl.styles import PatternFill, Font, Alignment
+          from pathlib import Path
+
+          ruta_datos = "datos"
+          ruta_transformados = "DatosTransformados"
+
+          # Obtener lista de archivos Excel
+          archivos_excel = [f for f in os.listdir(ruta_datos) if f.endswith('.xlsx')]
+          print(f'[*] Archivos encontrados: {archivos_excel}')
+
+          # ===== TRANSFORMACIÓN CONCRELAB =====
+          def transformar_concrelab(ruta_origen, ruta_destino):
+              print(f'\n[*] Transformando Concrelab: {os.path.basename(ruta_origen)}')
+
+              # Cargar Excel saltando 3 primeras filas vacías
+              df = pd.read_excel(ruta_origen, skiprows=3)
+              print(f'[+] Archivo cargado. Forma: {df.shape}')
+
+              # Mantener solo columnas especificadas
+              columnas_mantener = [
+                  'Proyecto',
+                  'Cilindro Nº',
+                  'Código de mezcla',
+                  'Localización',
+                  'Toma',
+                  'Rotura',
+                  'Edad (días)',
+                  'Resistencia nominal (MPa)',
+                  'Resistencia (MPa)',
+                  'Resistencia (%)'
+              ]
+
+              df = df[columnas_mantener]
+              print(f'[+] Columnas filtradas')
+
+              # Calcular promedio por grupo
+              df['Resistencia Promedio (MPa)'] = df.groupby(['Proyecto', 'Cilindro Nº', 'Edad (días)'])['Resistencia (MPa)'].transform('mean')
+
+              # Calcular conteo de elementos por grupo
+              df['Conteo Elementos'] = df.groupby(['Proyecto', 'Cilindro Nº', 'Edad (días)'])['Resistencia (MPa)'].transform('count')
+
+              # Renombrar columna original
+              df = df.rename(columns={'Resistencia (MPa)': 'Resistencia (MPa) Individual'})
+
+              # Calcular Resistencia (%) Individual
+              df['Resistencia (%) Individual'] = (df['Resistencia (MPa) Individual'] / df['Resistencia nominal (MPa)']) * 100
+
+              # Redondear campos numéricos a 3 decimales
+              columnas_numericas = ['Edad (días)', 'Resistencia nominal (MPa)', 'Resistencia (MPa) Individual', 'Resistencia (%) Individual', 'Resistencia Promedio (MPa)', 'Resistencia (%)']
+              df[columnas_numericas] = df[columnas_numericas].round(3)
+              print(f'[+] Cálculos realizados')
+
+              # Ordenar por Edad y Resistencia nominal
+              df = df.sort_values(['Edad (días)', 'Resistencia nominal (MPa)'], ascending=[False, False]).reset_index(drop=True)
+
+              # Crear columna Promedio móvil
+              df['Promedio móvil'] = None
+
+              # Procesar por grupos de Resistencia nominal
+              for resistencia_nom in df['Resistencia nominal (MPa)'].unique():
+                  grupo_idx = df[df['Resistencia nominal (MPa)'] == resistencia_nom].index.tolist()
+                  grupo_edad_28 = [idx for idx in grupo_idx if df.loc[idx, 'Edad (días)'] == 28]
+
+                  inicio = 0
+                  while inicio + 9 <= len(grupo_edad_28):
+                      indices_ventana = grupo_edad_28[inicio:inicio+9]
+                      valores_ventana = df.loc[indices_ventana, 'Resistencia Promedio (MPa)']
+                      promedio = valores_ventana.mean()
+
+                      posiciones_finales = indices_ventana[6:9]
+                      df.loc[posiciones_finales, 'Promedio móvil'] = round(promedio, 3)
+
+                      inicio += 3
+
+              # Reordenar columnas
+              cols = df.columns.tolist()
+              idx_promedio = cols.index('Resistencia Promedio (MPa)')
+              cols.remove('Promedio móvil')
+              cols.insert(idx_promedio + 1, 'Promedio móvil')
+              df = df[cols]
+
+              # Guardar
+              df.to_excel(ruta_destino, index=False)
+              print(f'[+] Datos guardados en DatosTransformados/')
+
+              # FORMATEO CONDICIONAL CON COLORES
+              print(f'[+] Aplicando formateo condicional')
+
+              # Cargar workbook
+              wb = load_workbook(ruta_destino)
+              ws = wb.active
+
+              # Obtener índices de columnas
+              col_promedio = df.columns.get_loc('Resistencia Promedio (MPa)') + 1
+              col_individual = df.columns.get_loc('Resistencia (MPa) Individual') + 1
+              col_individual_pct = df.columns.get_loc('Resistencia (%) Individual') + 1
+              col_conteo = df.columns.get_loc('Conteo Elementos') + 1
+
+              # Columnas que van en verde claro
+              columnas_verde_claro = ['Resistencia (%)', 'Proyecto', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']
+              col_verde_claro = [df.columns.get_loc(col) + 1 for col in columnas_verde_claro if col in df.columns]
+
+              # Colores
+              rojo = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+              verde = PatternFill(start_color="00B050", end_color="00B050", fill_type="solid")
+              azul_claro = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+              verde_claro = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+              azul_militar = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
+              blanco = Font(color="FFFFFF")
+
+              # Iterar filas
+              for row in range(2, ws.max_row + 1):
+                  valor_promedio = ws.cell(row, col_promedio).value
+
+                  # Colorear todas las columnas según su tipo
+                  for col_idx in range(1, ws.max_column + 1):
+                      celda = ws.cell(row, col_idx)
+
+                      if col_idx in col_verde_claro:
+                          celda.fill = verde_claro
+                      elif col_idx in [col_individual, col_individual_pct, col_conteo]:
+                          celda.fill = azul_claro
+
+                  # Formateo condicional rojo/verde para Resistencia Promedio
+                  if valor_promedio is not None:
+                      celda = ws.cell(row, col_promedio)
+                      celda.fill = rojo if valor_promedio < 0 else verde
+
+                  # Formato de porcentaje
+                  celda_individual_pct = ws.cell(row, col_individual_pct)
+                  celda_individual_pct.number_format = '0.00"%"'
+
+              # Colorear encabezados
+              for col_idx in range(1, ws.max_column + 1):
+                  celda_header = ws.cell(1, col_idx)
+                  celda_header.fill = azul_militar
+                  celda_header.font = blanco
+
+              # Guardar
+              wb.save(ruta_destino)
+              print(f'[+] ✓ Concrelab transformado')
+
+              return df
+
+          # ===== TRANSFORMACIÓN SGS =====
+          def transformar_sgs(ruta_origen, ruta_destino):
+              print(f'\n[*] Transformando SGS: {os.path.basename(ruta_origen)}')
+
+              # Cargar Excel
+              df = pd.read_excel(ruta_origen)
+              print(f'[+] Archivo cargado. Forma: {df.shape}')
+
+              # RENOMBRAR CAMPOS
+              print(f'[+] Renombrando campos...')
+              mapeo_campos = {
+                  'codigoObra': 'Proyecto',
+                  'asentamiento': 'Cilindro Nº',
+                  'codigoMezcla': 'Código de mezcla',
+                  'localizacion': 'Localización',
+                  'fechaMuestreo': 'Toma',
+                  'fechaRotura': 'Rotura',
+                  'edad': 'Edad (días)',
+                  'Resistencia Nominal Mpa': 'Resistencia nominal (MPa)',
+                  'Resistencia Mpa': 'Resistencia (MPa)',
+                  'porcentaje': 'Resistencia (%)'
+              }
+
+              df = df.rename(columns=mapeo_campos)
+
+              # MANTENER SOLO COLUMNAS REQUERIDAS
+              columnas_mantener = [
+                  'Proyecto',
+                  'Cilindro Nº',
+                  'Código de mezcla',
+                  'Localización',
+                  'Toma',
+                  'Rotura',
+                  'Edad (días)',
+                  'Resistencia nominal (MPa)',
+                  'Resistencia (MPa)',
+                  'Resistencia (%)'
+              ]
+
+              df = df[[col for col in columnas_mantener if col in df.columns]]
+              print(f'[+] Columnas filtradas y renombradas')
+
+              # Calcular promedio por grupo (SGS) - AGRUPAMIENTO CON LOCALIZACIÓN
+              df['Resistencia Promedio (MPa)'] = df.groupby(['Proyecto', 'Localización', 'Cilindro Nº', 'Edad (días)'])['Resistencia (MPa)'].transform('mean')
+
+              # Calcular conteo de elementos por grupo (SGS) - AGRUPAMIENTO CON LOCALIZACIÓN
+              df['Conteo Elementos'] = df.groupby(['Proyecto', 'Localización', 'Cilindro Nº', 'Edad (días)'])['Resistencia (MPa)'].transform('count')
+
+              # Renombrar columna original
+              df = df.rename(columns={'Resistencia (MPa)': 'Resistencia (MPa) Individual'})
+
+              # Calcular Resistencia (%) Individual
+              df['Resistencia (%) Individual'] = (df['Resistencia (MPa) Individual'] / df['Resistencia nominal (MPa)']) * 100
+
+              # Redondear campos numéricos a 3 decimales
+              columnas_numericas = ['Edad (días)', 'Resistencia nominal (MPa)', 'Resistencia (MPa) Individual', 'Resistencia (%) Individual', 'Resistencia Promedio (MPa)', 'Resistencia (%)']
+              df[columnas_numericas] = df[columnas_numericas].round(3)
+              print(f'[+] Cálculos realizados')
+
+              # Ordenar por Edad y Resistencia nominal
+              df = df.sort_values(['Edad (días)', 'Resistencia nominal (MPa)'], ascending=[False, False]).reset_index(drop=True)
+
+              # Crear columna Promedio móvil
+              df['Promedio móvil'] = None
+
+              # Procesar por grupos de Resistencia nominal
+              for resistencia_nom in df['Resistencia nominal (MPa)'].unique():
+                  grupo_idx = df[df['Resistencia nominal (MPa)'] == resistencia_nom].index.tolist()
+                  grupo_edad_28 = [idx for idx in grupo_idx if df.loc[idx, 'Edad (días)'] == 28]
+
+                  inicio = 0
+                  while inicio + 9 <= len(grupo_edad_28):
+                      indices_ventana = grupo_edad_28[inicio:inicio+9]
+                      valores_ventana = df.loc[indices_ventana, 'Resistencia Promedio (MPa)']
+                      promedio = valores_ventana.mean()
+
+                      posiciones_finales = indices_ventana[6:9]
+                      df.loc[posiciones_finales, 'Promedio móvil'] = round(promedio, 3)
+
+                      inicio += 3
+
+              # Reordenar columnas
+              cols = df.columns.tolist()
+              idx_promedio = cols.index('Resistencia Promedio (MPa)')
+              cols.remove('Promedio móvil')
+              cols.insert(idx_promedio + 1, 'Promedio móvil')
+              df = df[cols]
+
+              # Guardar
+              df.to_excel(ruta_destino, index=False)
+              print(f'[+] Datos guardados en DatosTransformados/')
+
+              # FORMATEO CONDICIONAL CON COLORES
+              print(f'[+] Aplicando formateo condicional')
+
+              # Cargar workbook
+              wb = load_workbook(ruta_destino)
+              ws = wb.active
+
+              # Obtener índices de columnas
+              col_promedio = df.columns.get_loc('Resistencia Promedio (MPa)') + 1
+              col_individual = df.columns.get_loc('Resistencia (MPa) Individual') + 1
+              col_individual_pct = df.columns.get_loc('Resistencia (%) Individual') + 1
+              col_conteo = df.columns.get_loc('Conteo Elementos') + 1
+
+              # Columnas que van en verde claro
+              columnas_verde_claro = ['Resistencia (%)', 'Proyecto', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']
+              col_verde_claro = [df.columns.get_loc(col) + 1 for col in columnas_verde_claro if col in df.columns]
+
+              # Colores
+              rojo = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+              verde = PatternFill(start_color="00B050", end_color="00B050", fill_type="solid")
+              azul_claro = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+              verde_claro = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+              azul_militar = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
+              blanco = Font(color="FFFFFF")
+
+              # Iterar filas
+              for row in range(2, ws.max_row + 1):
+                  valor_promedio = ws.cell(row, col_promedio).value
+
+                  # Colorear todas las columnas según su tipo
+                  for col_idx in range(1, ws.max_column + 1):
+                      celda = ws.cell(row, col_idx)
+
+                      if col_idx in col_verde_claro:
+                          celda.fill = verde_claro
+                      elif col_idx in [col_individual, col_individual_pct, col_conteo]:
+                          celda.fill = azul_claro
+
+                  # Formateo condicional rojo/verde para Resistencia Promedio
+                  if valor_promedio is not None:
+                      celda = ws.cell(row, col_promedio)
+                      celda.fill = rojo if valor_promedio < 0 else verde
+
+                  # Formato de porcentaje
+                  celda_individual_pct = ws.cell(row, col_individual_pct)
+                  celda_individual_pct.number_format = '0.00"%"'
+
+              # Colorear encabezados
+              for col_idx in range(1, ws.max_column + 1):
+                  celda_header = ws.cell(1, col_idx)
+                  celda_header.fill = azul_militar
+                  celda_header.font = blanco
+
+              # Guardar
+              wb.save(ruta_destino)
+              print(f'[+] ✓ SGS transformado')
+
+              return df
+
+          # ===== PROCESAR ARCHIVOS =====
+          lista_dataframes = []
+
+          for archivo in archivos_excel:
+              ruta_origen = os.path.join(ruta_datos, archivo)
+              ruta_destino = os.path.join(ruta_transformados, archivo)
+
+              if 'Concrelab' in archivo:
+                  df = transformar_concrelab(ruta_origen, ruta_destino)
+                  lista_dataframes.append(df)
+              elif 'SGS' in archivo:
+                  df = transformar_sgs(ruta_origen, ruta_destino)
+                  lista_dataframes.append(df)
+
+          print('\n[+] ✓ Todas las transformaciones completadas')
+
+          # ===== CREAR CONSOLIDADO =====
+          if lista_dataframes:
+              print(f'\n[*] Creando consolidado...')
+              df_consolidado = pd.concat(lista_dataframes, ignore_index=True)
+              print(f'[+] Consolidado creado. Forma: {df_consolidado.shape}')
+
+              # Guardar consolidado
+              ruta_consolidado = os.path.join(ruta_transformados, 'ConsolidadoResistenciasConcretos.xlsx')
+              df_consolidado.to_excel(ruta_consolidado, index=False)
+              print(f'[+] Consolidado guardado en: {ruta_consolidado}')
+
+              # FORMATEO CONSOLIDADO
+              print(f'[+] Aplicando formateo al consolidado')
+              wb = load_workbook(ruta_consolidado)
+              ws = wb.active
+
+              # Obtener índices de columnas
+              col_promedio = df_consolidado.columns.get_loc('Resistencia Promedio (MPa)') + 1
+              col_individual = df_consolidado.columns.get_loc('Resistencia (MPa) Individual') + 1
+              col_individual_pct = df_consolidado.columns.get_loc('Resistencia (%) Individual') + 1
+              col_conteo = df_consolidado.columns.get_loc('Conteo Elementos') + 1
+
+              # Columnas que van en verde claro
+              columnas_verde_claro = ['Resistencia (%)', 'Proyecto', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']
+              col_verde_claro = [df_consolidado.columns.get_loc(col) + 1 for col in columnas_verde_claro if col in df_consolidado.columns]
+
+              # Colores
+              rojo = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+              verde = PatternFill(start_color="00B050", end_color="00B050", fill_type="solid")
+              azul_claro = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+              verde_claro = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+              azul_militar = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
+              blanco = Font(color="FFFFFF")
+
+              # Iterar filas
+              for row in range(2, ws.max_row + 1):
+                  valor_promedio = ws.cell(row, col_promedio).value
+
+                  # Colorear todas las columnas según su tipo
+                  for col_idx in range(1, ws.max_column + 1):
+                      celda = ws.cell(row, col_idx)
+
+                      if col_idx in col_verde_claro:
+                          celda.fill = verde_claro
+                      elif col_idx in [col_individual, col_individual_pct, col_conteo]:
+                          celda.fill = azul_claro
+
+                  # Formateo condicional rojo/verde para Resistencia Promedio
+                  if valor_promedio is not None:
+                      celda = ws.cell(row, col_promedio)
+                      celda.fill = rojo if valor_promedio < 0 else verde
+
+                  # Formato de porcentaje
+                  celda_individual_pct = ws.cell(row, col_individual_pct)
+                  celda_individual_pct.number_format = '0.00"%"'
+
+              # Colorear encabezados
+              for col_idx in range(1, ws.max_column + 1):
+                  celda_header = ws.cell(1, col_idx)
+                  celda_header.fill = azul_militar
+                  celda_header.font = blanco
+
+              # Guardar
+              wb.save(ruta_consolidado)
+              print(f'[+] ✓ Consolidado formateado')
+          else:
+              print(f'[!] No hay archivos para consolidar')
+
+          EOF
+
+      - name: 🔧 Configurar Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action Bot"
+
+      - name: 🤖 Commit y Push
+        env:
+          RESISTENCIA_CONCRETOS_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+        run: |
+          git add datos/ DatosTransformados/
+
+          if git diff --quiet --cached; then
+            echo "[*] Sin cambios nuevos"
+          else
+            git commit -m "[AUTO] Transformación de datos - $(date '+%Y-%m-%d %H:%M:%S')"
+            git push origin main
+            echo "[+] ✓ Push completado"
+          fi
+
+      - name: 📊 Reporte final
+        if: always()
+        run: |
+          echo "=== TRANSFORMACIÓN COMPLETADA ==="
+          echo ""
+          echo "📥 Archivos originales (datos/):"
+          ls -lh datos/ 2>/dev/null || echo "No hay archivos"
+          echo ""
+          echo "📤 Archivos transformados (DatosTransformados/):"
+          ls -lh DatosTransformados/ 2>/dev/null || echo "No hay archivos"
+          echo ""
+          echo "Últimos commits:"
+          git log --oneline -3
