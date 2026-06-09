@@ -11,7 +11,7 @@ jobs:
       - name: 📥 Clonar repositorio
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.REPO_TOKEN }}
+          token: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
 
       - name: 🐍 Configurar Python 3.11
         uses: actions/setup-python@v4
@@ -226,7 +226,7 @@ jobs:
 
       - name: 🤖 Commit y Push
         env:
-          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
+          RESISTENCIA_CONCRETOS_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
         run: |
           git add datos/*_SGS.xlsx
           if git diff --quiet --cached; then
