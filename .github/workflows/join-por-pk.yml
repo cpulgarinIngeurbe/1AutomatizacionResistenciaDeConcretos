@@ -108,6 +108,7 @@ jobs:
               if col_dato_idx:
                   # Colores
                   azul_claro = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+                  rojo = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
                   azul_militar = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
                   blanco = Font(color="FFFFFF")
 
@@ -116,11 +117,13 @@ jobs:
                   celda_header.fill = azul_militar
                   celda_header.font = blanco
 
-                  # Colorear datos con valor
+                  # Colorear datos: azul si tiene valor, rojo si esta vacio
                   for row in range(2, ws.max_row + 1):
                       celda = ws.cell(row, col_dato_idx)
                       if celda.value is not None:
                           celda.fill = azul_claro
+                      else:
+                          celda.fill = rojo
 
               wb.save(archivo_transformado)
               print(f'[+] Formateo completado')
