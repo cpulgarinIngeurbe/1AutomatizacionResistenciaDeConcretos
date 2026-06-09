@@ -1,4 +1,4 @@
-# Última actualización: 2026-06-09 16:47:45
+# Última actualización: 2026-06-09 16:48:20
 name: 📊 Transformar Datos - Concrelab + SGS
 
 on:
@@ -92,6 +92,10 @@ jobs:
 
               df['TIPO'] = df['Localización'].apply(obtener_tipo)
               print(f'[+] Columna TIPO agregada')
+
+              # Crear columna PK (concatenación)
+              df['PK'] = df['Proyecto'].astype(str) + '_' + df['TIPO'].astype(str) + '_' + df['Resistencia nominal (MPa)'].astype(str) + '_' + df['Edad (días)'].astype(str)
+              print(f'[+] Columna PK agregada')
 
               # Calcular promedio por grupo
               df['Resistencia Promedio (MPa)'] = df.groupby(['Proyecto', 'Cilindro Nº', 'Edad (días)'])['Resistencia (MPa)'].transform('mean')
@@ -261,6 +265,10 @@ jobs:
 
               df['TIPO'] = df['Localización'].apply(obtener_tipo)
               print(f'[+] Columna TIPO agregada')
+
+              # Crear columna PK (concatenación)
+              df['PK'] = df['Proyecto'].astype(str) + '_' + df['TIPO'].astype(str) + '_' + df['Resistencia nominal (MPa)'].astype(str) + '_' + df['Edad (días)'].astype(str)
+              print(f'[+] Columna PK agregada')
 
               # Calcular promedio por grupo (SGS) - AGRUPAMIENTO CON LOCALIZACIÓN
               df['Resistencia Promedio (MPa)'] = df.groupby(['Proyecto', 'Localización', 'Cilindro Nº', 'Edad (días)'])['Resistencia (MPa)'].transform('mean')
