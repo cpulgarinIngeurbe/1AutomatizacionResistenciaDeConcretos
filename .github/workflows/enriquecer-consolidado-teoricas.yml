@@ -1,4 +1,4 @@
-# Última actualización: 2026-06-09 16:49:15
+# Última actualización: 2026-06-09 16:50:00
 name: 📊 Enriquecer Consolidado Teóricas - Agregar PK
 
 on:
@@ -39,8 +39,9 @@ jobs:
           print(f'[+] Columnas: {list(df.columns)}')
 
           # Crear columna PK (concatenación)
-          df['PK'] = df['Proyecto'].astype(str) + '_' + df['TIPO'].astype(str) + '_' + df['ResistenciaNominal'].astype(str) + '_' + df['Edad'].astype(str)
-          print(f'[+] Columna PK agregada')
+          # Verificar si la columna ya existe y recriarla
+          df['PK'] = df['Proyecto'].astype(str) + '_' + df['TIPO'].astype(str) + '_' + df['Resistencia nominal (MPa)'].astype(str) + '_' + df['Edad'].astype(str)
+          print(f'[+] Columna PK agregada/actualizada')
 
           # Guardar archivo
           df.to_excel(ruta_archivo, index=False)
@@ -55,7 +56,7 @@ jobs:
 
           # Obtener índices de columnas
           col_pk = df.columns.get_loc('PK') + 1
-          columnas_datos = ['Proyecto', 'TIPO', 'ResistenciaNominal', 'Edad']
+          columnas_datos = ['Proyecto', 'TIPO', 'Resistencia nominal (MPa)', 'Edad']
           col_datos = [df.columns.get_loc(col) + 1 for col in columnas_datos if col in df.columns]
 
           # Colores
