@@ -1,4 +1,4 @@
-# Última actualización: 2026-06-09 16:46:30
+# Última actualización: 2026-06-09 16:47:45
 name: 📊 Transformar Datos - Concrelab + SGS
 
 on:
@@ -75,6 +75,24 @@ jobs:
               df = df[columnas_mantener]
               print(f'[+] Columnas filtradas')
 
+              # Agregar columna TIPO según Localización
+              def obtener_tipo(localizacion):
+                  if pd.isna(localizacion):
+                      return None
+                  localizacion_upper = str(localizacion).upper()
+                  if "MURO" in localizacion_upper:
+                      return "MURO"
+                  elif "PLACA" in localizacion_upper:
+                      return "PLACA"
+                  elif "AUTOCOMPACTABLE" in localizacion_upper:
+                      return "AUTOCOMPACTABLE"
+                  elif "TREMIE" in localizacion_upper:
+                      return "TREMIE"
+                  return None
+
+              df['TIPO'] = df['Localización'].apply(obtener_tipo)
+              print(f'[+] Columna TIPO agregada')
+
               # Calcular promedio por grupo
               df['Resistencia Promedio (MPa)'] = df.groupby(['Proyecto', 'Cilindro Nº', 'Edad (días)'])['Resistencia (MPa)'].transform('mean')
 
@@ -139,7 +157,7 @@ jobs:
               col_conteo = df.columns.get_loc('Conteo Elementos') + 1
 
               # Columnas que van en verde claro
-              columnas_verde_claro = ['Resistencia (%)', 'Proyecto', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']
+              columnas_verde_claro = ['Resistencia (%)', 'Proyecto', 'TIPO', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']
               col_verde_claro = [df.columns.get_loc(col) + 1 for col in columnas_verde_claro if col in df.columns]
 
               # Colores
@@ -226,6 +244,24 @@ jobs:
               df = df[[col for col in columnas_mantener if col in df.columns]]
               print(f'[+] Columnas filtradas y renombradas')
 
+              # Agregar columna TIPO según Localización
+              def obtener_tipo(localizacion):
+                  if pd.isna(localizacion):
+                      return None
+                  localizacion_upper = str(localizacion).upper()
+                  if "MURO" in localizacion_upper:
+                      return "MURO"
+                  elif "PLACA" in localizacion_upper:
+                      return "PLACA"
+                  elif "AUTOCOMPACTABLE" in localizacion_upper:
+                      return "AUTOCOMPACTABLE"
+                  elif "TREMIE" in localizacion_upper:
+                      return "TREMIE"
+                  return None
+
+              df['TIPO'] = df['Localización'].apply(obtener_tipo)
+              print(f'[+] Columna TIPO agregada')
+
               # Calcular promedio por grupo (SGS) - AGRUPAMIENTO CON LOCALIZACIÓN
               df['Resistencia Promedio (MPa)'] = df.groupby(['Proyecto', 'Localización', 'Cilindro Nº', 'Edad (días)'])['Resistencia (MPa)'].transform('mean')
 
@@ -290,7 +326,7 @@ jobs:
               col_conteo = df.columns.get_loc('Conteo Elementos') + 1
 
               # Columnas que van en verde claro
-              columnas_verde_claro = ['Resistencia (%)', 'Proyecto', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']
+              columnas_verde_claro = ['Resistencia (%)', 'Proyecto', 'TIPO', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']
               col_verde_claro = [df.columns.get_loc(col) + 1 for col in columnas_verde_claro if col in df.columns]
 
               # Colores
@@ -374,7 +410,7 @@ jobs:
               col_conteo = df_consolidado.columns.get_loc('Conteo Elementos') + 1
 
               # Columnas que van en verde claro
-              columnas_verde_claro = ['Resistencia (%)', 'Proyecto', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']
+              columnas_verde_claro = ['Resistencia (%)', 'Proyecto', 'TIPO', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']
               col_verde_claro = [df_consolidado.columns.get_loc(col) + 1 for col in columnas_verde_claro if col in df_consolidado.columns]
 
               # Colores
