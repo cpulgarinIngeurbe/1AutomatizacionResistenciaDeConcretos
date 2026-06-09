@@ -1,0 +1,245 @@
+name: 📥 Descargas SGS - Multi Proyectos (Optimizado)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  descargar-sgs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.REPO_TOKEN }}
+
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Instalar Playwright
+        run: |
+          pip install playwright
+          playwright install chromium
+
+      - name: 🗑️ Limpiar carpeta datos
+        run: |
+          rm -rf datos/*_SGS.xlsx
+          mkdir -p datos
+
+      - name: ⬇️ Descargar SGS - Multi Proyectos (Paralelo)
+        env:
+          SECRETS_CONTEXT: ${{ toJson(secrets) }}
+        run: |
+          python << 'EOF'
+          import json
+          import os
+          import re
+          from playwright.sync_api import sync_playwright
+          from pathlib import Path
+
+          # Obtener secretos
+          secrets_str = os.getenv('SECRETS_CONTEXT', '{}')
+          secrets = json.loads(secrets_str)
+
+          # Detectar proyectos SGS
+          proyectos_sgs = {}
+          patron = r'^(\w+)_sgs_(usuario|contrasena)$'
+
+          for secret_name, secret_value in secrets.items():
+              secret_name_lower = secret_name.lower()
+              match = re.match(patron, secret_name_lower)
+              if match:
+                  proyecto_lower, tipo = match.groups()
+                  proyecto = secret_name.split('_')[0]
+
+                  if proyecto not in proyectos_sgs:
+                      proyectos_sgs[proyecto] = {}
+
+                  tipo_key = 'usuario' if tipo == 'usuario' else 'contrasena'
+                  proyectos_sgs[proyecto][tipo_key] = secret_value
+
+          print(f'[*] Proyectos SGS detectados: {list(proyectos_sgs.keys())}')
+          print(f'[*] Total: {len(proyectos_sgs)} proyecto(s)\n')
+
+          Path('datos').mkdir(exist_ok=True)
+
+          # Función para procesar proyecto
+          def procesar_proyecto(proyecto, email, password):
+              url_login = "https://qclient.sgs.com/authentication?redirectURL=%2Fhome"
+              print(f'\n[*] {proyecto} - SGS (iniciando)')
+
+              try:
+                  with sync_playwright() as p:
+                      browser = p.chromium.launch(headless=True)
+                      context = browser.new_context(accept_downloads=True)
+                      page = context.new_page()
+
+                      try:
+                          page.goto(url_login, timeout=60000)
+                          page.fill("input[id='user']", email)
+                          page.fill("input[id='password']", password)
+                          page.get_by_role("button", name="Ingresar").click()
+                          page.wait_for_selector("text=Reportes", timeout=60000)
+                          print(f'[+] {proyecto} ✓ Login')
+
+                          # CERRAR MODAL
+                          page.wait_for_timeout(1000)
+                          try:
+                              close_button = page.locator("#divModalTermines button.close, #divModalTermines .btn-close, #divModalTermines button[aria-label='Close']").first
+                              if close_button.is_visible():
+                                  close_button.click()
+                                  page.wait_for_timeout(500)
+                          except:
+                              pass
+                          page.keyboard.press("Escape")
+                          page.wait_for_timeout(800)
+
+                          print(f'[*] {proyecto} clickeando Reportes')
+                          page.click("text=Reportes")
+                          page.wait_for_selector("text=Generación de reportes", timeout=30000)
+
+                          print(f'[*] {proyecto} clickeando Generación de reportes')
+                          page.click("text=Generación de reportes")
+                          page.wait_for_selector("a.btn.btn-primary.icon-format-list-checks", timeout=30000)
+
+                          print(f'[*] {proyecto} clickeando botón formato lista')
+                          page.click("a.btn.btn-primary.icon-format-list-checks")
+                          page.wait_for_timeout(1500)
+                          page.keyboard.press("Escape")
+
+                          print(f'[*] {proyecto} seleccionando Tip de Reporte')
+                          page.wait_for_selector("mat-form-field:has-text('Tip de Reporte')", timeout=30000)
+                          page.click("mat-form-field:has-text('Tip de Reporte') div.mat-mdc-select-trigger")
+                          page.wait_for_timeout(300)
+                          for _ in range(3):
+                              page.keyboard.press("ArrowDown")
+                          page.keyboard.press("Enter")
+                          page.wait_for_timeout(1000)
+
+                          print(f'[*] {proyecto} seleccionando Código de Obra')
+                          page.click("mat-form-field:has-text('Código de Obra') div.mat-mdc-select-trigger")
+                          page.wait_for_timeout(5000)
+                          page.keyboard.press("ArrowDown")
+                          page.keyboard.press("Enter")
+                          page.wait_for_timeout(5000)
+
+                          print(f'[*] {proyecto} seleccionando Tipo Material')
+                          # Remover spinner antes de Tipo Material
+                          try:
+                              page.evaluate("""() => {
+                                  const spinners = document.querySelectorAll('.ngx-spinner-overlay');
+                                  spinners.forEach(s => {
+                                      s.style.display = 'none';
+                                      s.parentElement?.removeChild(s);
+                                  });
+                              }""")
+                          except:
+                              pass
+                          page.wait_for_timeout(1000)
+
+                          page.click("mat-form-field:has-text('Tipo Material') div.mat-mdc-select-trigger")
+                          page.wait_for_timeout(5000)
+                          page.keyboard.press("ArrowDown")
+                          page.keyboard.press("ArrowUp")
+                          page.keyboard.press("Enter")
+                          page.keyboard.press("Escape")
+                          page.wait_for_timeout(1500)
+
+                          # Remover overlay antes de filtro
+                          try:
+                              page.evaluate("""() => {
+                                  const overlays = document.querySelectorAll('.cdk-overlay-backdrop');
+                                  overlays.forEach(o => {
+                                      o.style.display = 'none';
+                                      o.parentElement?.removeChild(o);
+                                  });
+                              }""")
+                          except:
+                              pass
+                          page.wait_for_timeout(1000)
+
+                          # Click en filtro - CON REINTENTOS
+                          filtro_ok = False
+                          for intento_filtro in range(1, 3):
+                              try:
+                                  page.locator("button[type='submit'].btn.btn-secondary.btnPrincipal").first.click()
+                                  print(f'[+] {proyecto} ✓ Filtro')
+                                  filtro_ok = True
+                                  break
+                              except Exception as e:
+                                  if intento_filtro < 2:
+                                      page.wait_for_timeout(2000)
+                                  else:
+                                      print(f'[!] {proyecto} Filtro error')
+
+                          if not filtro_ok:
+                              raise Exception("Filtro falló")
+
+                          page.wait_for_timeout(1500)
+
+                          page.wait_for_selector("#mat-mdc-checkbox-1-input", timeout=30000)
+                          page.check("#mat-mdc-checkbox-1-input")
+                          page.wait_for_timeout(1000)
+
+                          page.wait_for_selector("button:has(i.icon-file-excel)", timeout=30000)
+
+                          for intento in range(1, 4):
+                              try:
+                                  with page.expect_download(timeout=60000) as download_info:
+                                      page.locator("button:has(i.icon-file-excel)").click()
+
+                                  page.wait_for_timeout(2000)
+                                  download = download_info.value
+                                  filepath = f'datos/{proyecto}_SGS.xlsx'
+                                  download.save_as(filepath)
+                                  print(f'[+] {proyecto} ✓ Descargado')
+                                  break
+                              except Exception as e:
+                                  if intento < 3:
+                                      page.wait_for_timeout(1500 * intento)
+                                  else:
+                                      print(f'[!] {proyecto} Error descarga')
+
+                      finally:
+                          browser.close()
+
+              except Exception as e:
+                  print(f'[!] {proyecto} Error: {str(e)[:50]}')
+
+          # Procesar secuencialmente (uno a la vez)
+          for proyecto, creds in proyectos_sgs.items():
+              if 'usuario' not in creds or 'contrasena' not in creds:
+                  continue
+
+              procesar_proyecto(proyecto, creds['usuario'], creds['contrasena'])
+
+          print('\n[+] ✓ Descargas SGS completadas')
+
+          EOF
+
+      - name: 🔧 Configurar Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action Bot"
+
+      - name: 🤖 Commit y Push
+        env:
+          REPO_TOKEN: ${{ secrets.REPO_TOKEN }}
+        run: |
+          git add datos/*_SGS.xlsx
+          if git diff --quiet --cached; then
+            echo "[*] Sin cambios SGS"
+          else
+            git commit -m "[AUTO] Descargas SGS $(date '+%Y-%m-%d %H:%M')"
+            git pull origin main --autostash
+            git push origin main
+            echo "[+] ✓ Push OK"
+          fi
+
+      - name: 📊 Reporte
+        if: always()
+        run: |
+          echo "=== RESULTADO SGS ==="
+          ls -lh datos/*_SGS.xlsx 2>/dev/null || echo "Sin archivos SGS"
