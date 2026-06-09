@@ -1,5 +1,5 @@
 # Última actualización: 2026-06-09
-name: 📊 Enriquecer Transformados con Campo Dato
+name: 📊 JOIN POR PK - Enriquecer Transformados con Dato
 
 on:
   workflow_dispatch:
