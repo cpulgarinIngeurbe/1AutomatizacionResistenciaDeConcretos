@@ -148,35 +148,54 @@ jobs:
                           page.keyboard.press("Escape")
                           page.wait_for_timeout(1500)
 
-                          # Remover overlay antes de filtro
+                          # Remover todos los overlays y spinners antes de filtro
                           try:
                               page.evaluate("""() => {
-                                  const overlays = document.querySelectorAll('.cdk-overlay-backdrop');
-                                  overlays.forEach(o => {
-                                      o.style.display = 'none';
-                                      o.parentElement?.removeChild(o);
+                                  // Remover backdrops
+                                  document.querySelectorAll('.cdk-overlay-backdrop, .modal-backdrop').forEach(e => {
+                                      e.style.display = 'none';
+                                      e.parentElement?.removeChild(e);
+                                  });
+                                  // Remover spinners
+                                  document.querySelectorAll('.ngx-spinner-overlay, [ngxSpinner]').forEach(e => {
+                                      e.style.display = 'none';
+                                      e.parentElement?.removeChild(e);
+                                  });
+                                  // Remover modales/dialogs
+                                  document.querySelectorAll('.modal, .dialog, .mat-mdc-dialog-container').forEach(e => {
+                                      e.style.visibility = 'hidden';
+                                      e.style.display = 'none';
                                   });
                               }""")
                           except:
                               pass
-                          page.wait_for_timeout(1000)
+                          page.wait_for_timeout(800)
 
                           # Click en filtro - CON REINTENTOS
                           filtro_ok = False
-                          for intento_filtro in range(1, 3):
+                          for intento_filtro in range(1, 4):
                               try:
-                                  page.locator("button[type='submit'].btn.btn-secondary.btnPrincipal").first.click()
+                                  filtro_btn = page.locator("button[type='submit'].btn.btn-secondary.btnPrincipal").first
+
+                                  # Esperar a que el botón sea visible y clickeable
+                                  filtro_btn.scroll_into_view_if_needed()
+                                  page.wait_for_function("() => document.querySelector('button[type=\"submit\"].btn.btn-secondary.btnPrincipal') && document.querySelector('button[type=\"submit\"].btn.btn-secondary.btnPrincipal').offsetParent !== null", timeout=10000)
+
+                                  # Click con force para asegurar que clickea
+                                  filtro_btn.click(force=True)
+                                  page.wait_for_timeout(1500)
                                   print(f'[+] {proyecto} ✓ Filtro')
                                   filtro_ok = True
                                   break
                               except Exception as e:
-                                  if intento_filtro < 2:
+                                  if intento_filtro < 3:
+                                      print(f'[*] {proyecto} Filtro intento {intento_filtro} falló, reintentando...')
                                       page.wait_for_timeout(2000)
                                   else:
-                                      print(f'[!] {proyecto} Filtro error')
+                                      print(f'[!] {proyecto} Filtro error después de {intento_filtro-1} reintentos')
 
                           if not filtro_ok:
-                              raise Exception("Filtro falló")
+                              raise Exception("Filtro falló después de múltiples intentos")
 
                           page.wait_for_timeout(1500)
 
