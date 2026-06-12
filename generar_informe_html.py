@@ -1,6 +1,12 @@
 import pandas as pd
 import os
+import sys
 from datetime import datetime
+
+# Configurar codificación UTF-8 para stdout
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
 def generar_informe_html():
     """Genera un informe HTML filterable a partir del ConsolidadoResistenciasConcretos.xlsx"""
