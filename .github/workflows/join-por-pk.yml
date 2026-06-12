@@ -87,7 +87,11 @@ jobs:
               print(f'[+] Coincidencias encontradas: {coincidencias}/{total}')
 
               # Crear nueva columna "Cumplimiento norma b" = Dato - Resistencia Promedio
-              df_transformado['Cumplimiento norma b'] = df_transformado['Dato'] - df_transformado['Resistencia Promedio']
+              # Si Dato está vacío, el resultado es "NoValido"
+              df_transformado['Cumplimiento norma b'] = df_transformado.apply(
+                  lambda row: 'NoValido' if pd.isna(row['Dato']) else row['Dato'] - row['Resistencia Promedio'],
+                  axis=1
+              )
               print(f'[+] Columna "Cumplimiento norma b" calculada')
 
               # Limpiar columnas temporales
