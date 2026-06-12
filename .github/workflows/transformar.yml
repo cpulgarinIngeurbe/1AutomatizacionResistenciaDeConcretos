@@ -470,6 +470,7 @@ jobs:
           python << 'EOF'
           import pandas as pd
           import numpy as np
+          import os
           from openpyxl import load_workbook
           from openpyxl.styles import PatternFill, Font
 
@@ -490,13 +491,18 @@ jobs:
 
           print(f'[+] Columna de join_key creada en Teóricas')
 
-          # Archivos a enriquecer
+          # Archivos a enriquecer - solo si existen
           archivos_transformados = [
               "DatosTransformados/ConsolidadoResistenciasConcretos.xlsx",
               "DatosTransformados/VIALE_SGS.xlsx"
           ]
 
           for archivo_transformado in archivos_transformados:
+              # Verificar si el archivo existe
+              if not os.path.exists(archivo_transformado):
+                  print(f'\n[*] Archivo no existe aún: {archivo_transformado} (omitiendo)')
+                  continue
+
               print(f'\n[*] Procesando: {archivo_transformado}')
 
               # Leer archivo transformado
