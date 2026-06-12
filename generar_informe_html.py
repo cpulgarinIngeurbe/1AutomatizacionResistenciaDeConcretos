@@ -47,96 +47,107 @@ def generar_informe_html():
         # Convertir datos a JSON para JavaScript
         datos_json = df.to_json(orient='records', default_handler=str)
 
-        # Crear HTML
-        html_content = f"""<!DOCTYPE html>
+        # Calcular índices de columnas para colores
+        columnas_verdes_idx = [i for i, col in enumerate(df.columns) if col in [
+            'Resistencia (%)', 'Proyecto', 'TIPO', 'Cilindro Nº', 'Código de mezcla',
+            'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)'
+        ]]
+        columnas_azules_idx = [i for i, col in enumerate(df.columns) if col in [
+            'Resistencia (MPa) Individual', 'Resistencia (%) Individual', 'Conteo Elementos'
+        ]]
+        nombres_columnas = df.columns.tolist()
+        fecha_generacion = datetime.now().strftime('%d de %B de %Y a las %H:%M:%S')
+
+        # HTML base
+        html_content = """<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Informe de Resistencia de Concretos</title>
     <style>
-        * {{
+        * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-        }}
+        }
 
-        body {{
+        body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
-        }}
+        }
 
-        .container {{
+        .container {
             max-width: 1800px;
             margin: 0 auto;
             background: white;
             border-radius: 10px;
             box-shadow: 0 10px 40px rgba(0,0,0,0.2);
             padding: 30px;
-        }}
+        }
 
-        header {{
+        header {
             text-align: center;
             margin-bottom: 30px;
             border-bottom: 3px solid #667eea;
             padding-bottom: 20px;
-        }}
+        }
 
-        h1 {{
+        h1 {
             color: #333;
             font-size: 2.5em;
             margin-bottom: 10px;
-        }}
+        }
 
-        .fecha-generacion {{
+        .fecha-generacion {
             color: #666;
             font-size: 0.9em;
             margin-top: 10px;
-        }}
+        }
 
-        .filtros-section {{
+        .filtros-section {
             background: #f8f9fa;
             padding: 20px;
             border-radius: 8px;
             margin-bottom: 25px;
             border: 1px solid #e9ecef;
-        }}
+        }
 
-        .filtros-section h2 {{
+        .filtros-section h2 {
             color: #667eea;
             font-size: 1.2em;
             margin-bottom: 15px;
             display: flex;
             align-items: center;
-        }}
+        }
 
-        .filtros-section h2::before {{
+        .filtros-section h2::before {
             content: "🔍";
             margin-right: 10px;
-        }}
+        }
 
-        .filtros-grid {{
+        .filtros-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 15px;
             margin-bottom: 15px;
-        }}
+        }
 
-        .filtro-grupo {{
+        .filtro-grupo {
             display: flex;
             flex-direction: column;
-        }}
+        }
 
-        .filtro-grupo label {{
+        .filtro-grupo label {
             font-weight: 600;
             color: #333;
             margin-bottom: 5px;
             font-size: 0.95em;
-        }}
+        }
 
-        .filtro-grupo select {{
+        .filtro-grupo select {
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
@@ -144,21 +155,21 @@ def generar_informe_html():
             transition: border-color 0.3s;
             background-color: white;
             cursor: pointer;
-        }}
+        }
 
-        .filtro-grupo select:focus {{
+        .filtro-grupo select:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 5px rgba(102, 126, 234, 0.1);
-        }}
+        }
 
-        .botones-filtro {{
+        .botones-filtro {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
-        }}
+        }
 
-        button {{
+        button {
             padding: 10px 20px;
             border: none;
             border-radius: 5px;
@@ -166,81 +177,81 @@ def generar_informe_html():
             cursor: pointer;
             transition: all 0.3s;
             font-size: 0.95em;
-        }}
+        }
 
-        .btn-filtrar {{
+        .btn-filtrar {
             background: #667eea;
             color: white;
-        }}
+        }
 
-        .btn-filtrar:hover {{
+        .btn-filtrar:hover {
             background: #5568d3;
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }}
+        }
 
-        .btn-limpiar {{
+        .btn-limpiar {
             background: #e9ecef;
             color: #333;
-        }}
+        }
 
-        .btn-limpiar:hover {{
+        .btn-limpiar:hover {
             background: #dee2e6;
-        }}
+        }
 
-        .tabla-section {{
+        .tabla-section {
             overflow-x: auto;
             margin-top: 20px;
-        }}
+        }
 
-        table {{
+        table {
             width: 100%;
             border-collapse: collapse;
-        }}
+        }
 
-        thead {{
+        thead {
             background: #1F4788;
             color: white;
             position: sticky;
             top: 0;
             z-index: 10;
-        }}
+        }
 
-        thead th {{
+        thead th {
             padding: 12px;
             text-align: left;
             font-weight: 600;
             border: 1px solid #1F4788;
             font-size: 0.9em;
-        }}
+        }
 
-        tbody tr {{
+        tbody tr {
             border-bottom: 1px solid #e9ecef;
             transition: background-color 0.2s;
-        }}
+        }
 
-        tbody tr:hover {{
+        tbody tr:hover {
             background: #f0f0f0;
-        }}
+        }
 
-        tbody td {{
+        tbody td {
             padding: 10px 12px;
             font-size: 0.9em;
-        }}
+        }
 
-        tbody tr:nth-child(even) {{
+        tbody tr:nth-child(even) {
             background: #f8f9fa;
-        }}
+        }
 
-        .datos-verdes {{
+        .datos-verdes {
             background: #90EE90 !important;
-        }}
+        }
 
-        .datos-azules {{
+        .datos-azules {
             background: #ADD8E6 !important;
-        }}
+        }
 
-        .info-tabla {{
+        .info-tabla {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -250,16 +261,17 @@ def generar_informe_html():
             border-radius: 5px;
             color: #666;
             font-size: 0.9em;
-        }}
+        }
 
-        .paginacion {{
+        .paginacion {
             display: flex;
             justify-content: center;
             gap: 5px;
             margin-top: 20px;
-        }}
+            flex-wrap: wrap;
+        }
 
-        .paginacion button {{
+        .paginacion button {
             padding: 8px 12px;
             border: 1px solid #ddd;
             background: white;
@@ -267,70 +279,75 @@ def generar_informe_html():
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.3s;
-        }}
+        }
 
-        .paginacion button:hover {{
+        .paginacion button:hover {
             background: #667eea;
             color: white;
             border-color: #667eea;
-        }}
+        }
 
-        .paginacion button.active {{
+        .paginacion button.active {
             background: #667eea;
             color: white;
             border-color: #667eea;
-        }}
+        }
 
-        .paginacion button:disabled {{
+        .paginacion button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
-        }}
+        }
 
-        .no-resultados {{
+        .paginacion span {
+            padding: 8px 5px;
+            color: #999;
+        }
+
+        .no-resultados {
             text-align: center;
             padding: 40px;
             color: #999;
             font-size: 1.1em;
-        }}
+        }
 
-        footer {{
+        footer {
             text-align: center;
             margin-top: 30px;
             padding-top: 20px;
             border-top: 1px solid #e9ecef;
             color: #666;
             font-size: 0.9em;
-        }}
+        }
 
-        @media (max-width: 768px) {{
-            .container {{
+        @media (max-width: 768px) {
+            .container {
                 padding: 15px;
-            }}
+            }
 
-            h1 {{
+            h1 {
                 font-size: 1.8em;
-            }}
+            }
 
-            .filtros-grid {{
+            .filtros-grid {
                 grid-template-columns: 1fr;
-            }}
+            }
 
-            table {{
+            table {
                 font-size: 0.8em;
-            }}
+            }
 
             thead th,
-            tbody td {{
+            tbody td {
                 padding: 6px;
-            }}
-        }}
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
             <h1>Informe de Resistencia de Concretos</h1>
-            <p class="fecha-generacion">Generado: {datetime.now().strftime('%d de %B de %Y a las %H:%M:%S')}</p>
+            <p class="fecha-generacion">Generado: """ + fecha_generacion + """</p>
         </header>
 
         <div class="filtros-section">
@@ -342,7 +359,7 @@ def generar_informe_html():
                         <option value="">-- Todos --</option>
 """
 
-        # Agregar opciones para Proyecto
+        # Agregar opciones para cada filtro
         for valor in filtros_unicos.get("Proyecto", []):
             html_content += f'                        <option value="{valor}">{valor}</option>\n'
 
@@ -353,8 +370,6 @@ def generar_informe_html():
                     <select id="filtro-localizacion">
                         <option value="">-- Todos --</option>
 """
-
-        # Agregar opciones para Localización
         for valor in filtros_unicos.get("Localización", []):
             html_content += f'                        <option value="{valor}">{valor}</option>\n'
 
@@ -365,8 +380,6 @@ def generar_informe_html():
                     <select id="filtro-edad">
                         <option value="">-- Todos --</option>
 """
-
-        # Agregar opciones para Edad
         for valor in filtros_unicos.get("Edad (días)", []):
             html_content += f'                        <option value="{valor}">{valor}</option>\n'
 
@@ -377,8 +390,6 @@ def generar_informe_html():
                     <select id="filtro-resistencia-nominal">
                         <option value="">-- Todos --</option>
 """
-
-        # Agregar opciones para Resistencia nominal
         for valor in filtros_unicos.get("Resistencia nominal (MPa)", []):
             html_content += f'                        <option value="{valor}">{valor}</option>\n'
 
@@ -389,9 +400,7 @@ def generar_informe_html():
                     <select id="filtro-resistencia-individual">
                         <option value="">-- Todos --</option>
 """
-
-        # Agregar opciones para Resistencia Individual
-        for valor in filtros_unicos.get("Resistencia (MPa) Individual", [])[:100]:  # Limitar a 100 opciones
+        for valor in filtros_unicos.get("Resistencia (MPa) Individual", [])[:100]:
             html_content += f'                        <option value="{valor}">{valor}</option>\n'
 
         html_content += """                    </select>
@@ -401,8 +410,6 @@ def generar_informe_html():
                     <select id="filtro-dato">
                         <option value="">-- Todos --</option>
 """
-
-        # Agregar opciones para Dato
         for valor in filtros_unicos.get("Dato", []):
             html_content += f'                        <option value="{valor}">{valor}</option>\n'
 
@@ -444,34 +451,35 @@ def generar_informe_html():
     </div>
 
     <script>
-        // Datos globales
-        const todosDatos = {datos_json};
+        // Datos
+        const datosRaw = """ + datos_json + """;
+        const todosDatos = typeof datosRaw === 'string' ? JSON.parse(datosRaw) : datosRaw;
         let datosFiltrados = todosDatos;
         const registrosPorPagina = 50;
         let paginaActual = 1;
 
-        // Índices de columnas para colores
-        const columnasVerdes = {json.dumps([i for i, col in enumerate(df.columns) if col in ['Resistencia (%)', 'Proyecto', 'TIPO', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']])};
-        const columnasAzules = {json.dumps([i for i, col in enumerate(df.columns) if col in ['Resistencia (MPa) Individual', 'Resistencia (%) Individual', 'Conteo Elementos']])};
-        const nombresColumnas = {json.dumps(df.columns.tolist())};
+        // Índices de columnas
+        const columnasVerdes = """ + json.dumps(columnas_verdes_idx) + """;
+        const columnasAzules = """ + json.dumps(columnas_azules_idx) + """;
+        const nombresColumnas = """ + json.dumps(nombres_columnas) + """;
 
-        // Inicializar tabla
-        document.addEventListener('DOMContentLoaded', function() {{
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', function() {
             mostrarPagina(1);
             configurarPaginacion();
-        }});
+        });
 
-        function aplicarFiltros() {{
-            const filtros = {{
+        function aplicarFiltros() {
+            const filtros = {
                 proyecto: document.getElementById('filtro-proyecto').value,
                 localizacion: document.getElementById('filtro-localizacion').value,
                 edad: document.getElementById('filtro-edad').value,
                 resistenciaNominal: document.getElementById('filtro-resistencia-nominal').value,
                 resistenciaIndividual: document.getElementById('filtro-resistencia-individual').value,
                 dato: document.getElementById('filtro-dato').value
-            }};
+            };
 
-            datosFiltrados = todosDatos.filter(row => {{
+            datosFiltrados = todosDatos.filter(row => {
                 if (filtros.proyecto && String(row['Proyecto']) !== filtros.proyecto) return false;
                 if (filtros.localizacion && String(row['Localización']) !== filtros.localizacion) return false;
                 if (filtros.edad && String(row['Edad (días)']) !== filtros.edad) return false;
@@ -479,14 +487,14 @@ def generar_informe_html():
                 if (filtros.resistenciaIndividual && String(row['Resistencia (MPa) Individual']) !== filtros.resistenciaIndividual) return false;
                 if (filtros.dato && String(row['Dato']) !== filtros.dato) return false;
                 return true;
-            }});
+            });
 
             paginaActual = 1;
             mostrarPagina(1);
             configurarPaginacion();
-        }}
+        }
 
-        function limpiarFiltros() {{
+        function limpiarFiltros() {
             document.getElementById('filtro-proyecto').value = '';
             document.getElementById('filtro-localizacion').value = '';
             document.getElementById('filtro-edad').value = '';
@@ -498,9 +506,9 @@ def generar_informe_html():
             paginaActual = 1;
             mostrarPagina(1);
             configurarPaginacion();
-        }}
+        }
 
-        function mostrarPagina(numero) {{
+        function mostrarPagina(numero) {
             paginaActual = numero;
             const inicio = (numero - 1) * registrosPorPagina;
             const fin = inicio + registrosPorPagina;
@@ -509,103 +517,100 @@ def generar_informe_html():
             const tbody = document.getElementById('tabla-body');
             tbody.innerHTML = '';
 
-            if (registrosPagina.length === 0) {{
+            if (registrosPagina.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="' + nombresColumnas.length + '" class="no-resultados">No se encontraron registros</td></tr>';
                 actualizarInfo();
                 return;
-            }}
+            }
 
-            registrosPagina.forEach(row => {{
+            registrosPagina.forEach(row => {
                 const tr = document.createElement('tr');
-                nombresColumnas.forEach((col, idx) => {{
+                nombresColumnas.forEach((col, idx) => {
                     const td = document.createElement('td');
                     const valor = row[col] !== null && row[col] !== undefined ? String(row[col]) : '';
                     td.textContent = valor;
 
-                    if (columnasVerdes.includes(idx)) {{
+                    if (columnasVerdes.includes(idx)) {
                         td.className = 'datos-verdes';
-                    }} else if (columnasAzules.includes(idx)) {{
+                    } else if (columnasAzules.includes(idx)) {
                         td.className = 'datos-azules';
-                    }}
+                    }
 
                     tr.appendChild(td);
-                }});
+                });
                 tbody.appendChild(tr);
-            }});
+            });
 
             actualizarInfo();
-        }}
+        }
 
-        function configurarPaginacion() {{
+        function configurarPaginacion() {
             const totalPaginas = Math.ceil(datosFiltrados.length / registrosPorPagina);
             const paginacionDiv = document.getElementById('paginacion');
             paginacionDiv.innerHTML = '';
 
             if (totalPaginas <= 1) return;
 
-            // Botón anterior
             const btnAnterior = document.createElement('button');
             btnAnterior.textContent = '← Anterior';
             btnAnterior.disabled = paginaActual === 1;
-            btnAnterior.onclick = () => {{
+            btnAnterior.onclick = () => {
                 if (paginaActual > 1) mostrarPagina(paginaActual - 1);
-            }};
+            };
             paginacionDiv.appendChild(btnAnterior);
 
-            // Números de página
             const inicio = Math.max(1, paginaActual - 2);
             const fin = Math.min(totalPaginas, paginaActual + 2);
 
-            if (inicio > 1) {{
+            if (inicio > 1) {
                 const btn1 = document.createElement('button');
                 btn1.textContent = '1';
                 btn1.onclick = () => mostrarPagina(1);
                 paginacionDiv.appendChild(btn1);
 
-                if (inicio > 2) {{
+                if (inicio > 2) {
                     const puntos = document.createElement('span');
                     puntos.textContent = '...';
                     paginacionDiv.appendChild(puntos);
-                }}
-            }}
+                }
+            }
 
-            for (let i = inicio; i <= fin; i++) {{
+            for (let i = inicio; i <= fin; i++) {
                 const btn = document.createElement('button');
                 btn.textContent = i;
                 if (i === paginaActual) btn.className = 'active';
                 btn.onclick = () => mostrarPagina(i);
                 paginacionDiv.appendChild(btn);
-            }}
+            }
 
-            if (fin < totalPaginas) {{
-                if (fin < totalPaginas - 1) {{
+            if (fin < totalPaginas) {
+                if (fin < totalPaginas - 1) {
                     const puntos = document.createElement('span');
                     puntos.textContent = '...';
                     paginacionDiv.appendChild(puntos);
-                }}
+                }
 
                 const btnUltima = document.createElement('button');
                 btnUltima.textContent = totalPaginas;
                 btnUltima.onclick = () => mostrarPagina(totalPaginas);
                 paginacionDiv.appendChild(btnUltima);
-            }}
+            }
 
-            // Botón siguiente
             const btnSiguiente = document.createElement('button');
             btnSiguiente.textContent = 'Siguiente →';
             btnSiguiente.disabled = paginaActual === totalPaginas;
-            btnSiguiente.onclick = () => {{
+            btnSiguiente.onclick = () => {
                 if (paginaActual < totalPaginas) mostrarPagina(paginaActual + 1);
-            }};
+            };
             paginacionDiv.appendChild(btnSiguiente);
-        }}
+        }
 
-        function actualizarInfo() {{
+        function actualizarInfo() {
             const inicio = (paginaActual - 1) * registrosPorPagina + 1;
             const fin = Math.min(paginaActual * registrosPorPagina, datosFiltrados.length);
-            const texto = `Mostrando ${{inicio}} a ${{fin}} de ${{datosFiltrados.length}} registros (Total: ${{todosDatos.length}})`;
+            const texto = `Mostrando ${inicio} a ${fin} de ${datosFiltrados.length} registros (Total: ${todosDatos.length})`;
             document.getElementById('info-texto').textContent = texto;
-        }}
+        }
     </script>
 </body>
 </html>
