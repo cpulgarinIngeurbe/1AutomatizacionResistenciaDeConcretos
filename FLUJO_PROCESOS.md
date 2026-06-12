@@ -113,6 +113,7 @@ El orquestador ejecuta:
   PASO 1: Descarga de datos SGS (5-10 min)
   PASO 2: Transformación de datos (3-4 min)
   PASO 3: Generación de informe (1-2 min)
+  PASO 4: Despliegue en GitHub Pages (1-2 min)
 
 Características:
 ✓ Ejecuta cada workflow de forma SECUENCIAL
@@ -121,7 +122,7 @@ Características:
 ✓ Aborta si algún paso falla
 ✓ Genera reporte final
 
-Tiempo total aproximado: 10-20 minutos
+Tiempo total aproximado: 12-22 minutos (incluyendo despliegue en GitHub Pages)
 
 Nota: El enriquecimiento teórico queda fuera (se ejecuta manualmente si es necesario)
 ```

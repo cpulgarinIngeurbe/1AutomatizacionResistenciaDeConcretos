@@ -19,6 +19,11 @@ on:
         required: true
         type: boolean
         default: true
+      ejecutar_github_pages:
+        description: "Esperar a que GitHub Pages se despliegue"
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   orquestar:
@@ -203,6 +208,52 @@ jobs:
             exit 1
           fi
 
+      - name: "🌐 PASO 4: Despliegue en GitHub Pages"
+        if: ${{ inputs.ejecutar_github_pages == true }}
+        env:
+          GH_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+        run: |
+          echo "==================================="
+          echo "🔄 Esperando despliegue GitHub Pages"
+          echo "==================================="
+
+          echo "[*] Esperando a que GitHub Pages desplegue el informe..."
+
+          # Esperar con timeout de 5 minutos
+          TIMEOUT=300
+          ELAPSED=0
+          INTERVAL=10
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            # Buscar el workflow "pages build and deployment"
+            RESPONSE=$(curl -s \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/actions/workflows/pages%2Fbuild-deployment/runs?per_page=1)
+
+            STATUS=$(echo $RESPONSE | jq -r '.workflow_runs[0].status // "unknown"')
+            CONCLUSION=$(echo $RESPONSE | jq -r '.workflow_runs[0].conclusion // "unknown"')
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "[+] ✓ GITHUB PAGES DESPLEGADO EXITOSAMENTE"
+                break
+              else
+                echo "[!] ✗ DESPLIEGUE FALLÓ (Conclusion: $CONCLUSION)"
+                exit 1
+              fi
+            fi
+
+            echo "[*] Estado: $STATUS | Esperado: 10s más..."
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "[!] ✗ TIMEOUT: GitHub Pages se tardó más de 5 minutos"
+            exit 1
+          fi
+
       - name: "✅ RESUMEN FINAL"
         if: success()
         run: |
@@ -215,6 +266,7 @@ jobs:
           [ "${{ inputs.ejecutar_descarga }}" = "true" ] && echo "  ✓ PASO 1: Descarga de datos SGS" || echo "  ⊘ PASO 1: Descarga (omitido)"
           [ "${{ inputs.ejecutar_transformacion }}" = "true" ] && echo "  ✓ PASO 2: Transformación de datos" || echo "  ⊘ PASO 2: Transformación (omitido)"
           [ "${{ inputs.ejecutar_informe }}" = "true" ] && echo "  ✓ PASO 3: Generación de informe" || echo "  ⊘ PASO 3: Informe (omitido)"
+          [ "${{ inputs.ejecutar_github_pages }}" = "true" ] && echo "  ✓ PASO 4: Despliegue GitHub Pages" || echo "  ⊘ PASO 4: GitHub Pages (omitido)"
           echo ""
           echo "📊 El informe estará disponible en:"
           echo "   https://github.com/${{ github.repository }}/actions"
