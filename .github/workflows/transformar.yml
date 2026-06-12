@@ -608,6 +608,112 @@ jobs:
 
           EOF
 
+      - name: "📋 Crear Excel filtrado - Cumplimiento norma b > 0"
+        run: |
+          python << 'EOF'
+          import pandas as pd
+          from openpyxl import load_workbook
+          from openpyxl.styles import PatternFill, Font
+          import os
+
+          print('[*] Creando Excel filtrado con datos que cumplen (Cumplimiento norma b > 0)')
+
+          # Leer archivo consolidado enriquecido
+          archivo_origen = "DatosTransformados/ConsolidadoResistenciasConcretos.xlsx"
+
+          if not os.path.exists(archivo_origen):
+              print(f'[!] Archivo no encontrado: {archivo_origen}')
+              exit(1)
+
+          df = pd.read_excel(archivo_origen)
+          print(f'[+] Archivo original cargado. Total registros: {len(df)}')
+
+          # Verificar que la columna existe
+          if 'Cumplimiento norma b' not in df.columns:
+              print(f'[!] Columna Cumplimiento norma b no encontrada')
+              exit(1)
+
+          # Filtrar solo registros donde Cumplimiento norma b > 0
+          # Convertir a numérico, los "NoValido" serán NaN
+          df['Cumplimiento_num'] = pd.to_numeric(df['Cumplimiento norma b'], errors='coerce')
+          df_filtrado = df[df['Cumplimiento_num'] > 0].copy()
+
+          # Eliminar la columna temporal
+          df_filtrado = df_filtrado.drop(columns=['Cumplimiento_num'])
+
+          registros_filtrados = len(df_filtrado)
+          print(f'[+] Registros que cumplen (Cumplimiento norma b > 0): {registros_filtrados}')
+          print(f'[+] Porcentaje de cumplimiento: {(registros_filtrados/len(df)*100):.2f}%')
+
+          # Guardar nuevo archivo
+          archivo_salida = "DatosTransformados/ConsolidadoResistenciasConcretos_Cumple.xlsx"
+          df_filtrado.to_excel(archivo_salida, index=False)
+          print(f'[+] Archivo guardado: {archivo_salida}')
+
+          # Aplicar formateo
+          print(f'[+] Aplicando formateo al archivo filtrado')
+          wb = load_workbook(archivo_salida)
+          ws = wb.active
+
+          # Obtener índices de columnas especiales
+          col_dato_idx = None
+          col_cumplimiento_idx = None
+          col_promedio = None
+          col_individual = None
+          col_individual_pct = None
+          col_conteo = None
+
+          for col_num, col_letter in enumerate(ws.columns, 1):
+              col_name = ws.cell(1, col_num).value
+              if col_name == 'Dato':
+                  col_dato_idx = col_num
+              elif col_name == 'Cumplimiento norma b':
+                  col_cumplimiento_idx = col_num
+              elif col_name == 'Resistencia Promedio (MPa)':
+                  col_promedio = col_num
+              elif col_name == 'Resistencia (MPa) Individual':
+                  col_individual = col_num
+              elif col_name == 'Resistencia (%) Individual':
+                  col_individual_pct = col_num
+              elif col_name == 'Conteo Elementos':
+                  col_conteo = col_num
+
+          # Colores
+          azul_claro = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+          verde = PatternFill(start_color="00B050", end_color="00B050", fill_type="solid")
+          verde_claro = PatternFill(start_color="90EE90", end_color="90EE90", fill_type="solid")
+          azul_militar = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
+          blanco = Font(color="FFFFFF")
+
+          # Colorear encabezados
+          for col_idx in range(1, ws.max_column + 1):
+              celda_header = ws.cell(1, col_idx)
+              celda_header.fill = azul_militar
+              celda_header.font = blanco
+
+          # Colorear datos
+          for row in range(2, ws.max_row + 1):
+              for col_idx in range(1, ws.max_column + 1):
+                  celda = ws.cell(row, col_idx)
+
+                  # Columnas verdes
+                  if col_idx == col_promedio:
+                      valor = celda.value
+                      if valor is not None:
+                          celda.fill = verde if valor >= 0 else None
+                  # Columnas azules
+                  elif col_idx in [col_individual, col_individual_pct, col_conteo, col_cumplimiento_idx]:
+                      celda.fill = azul_claro
+                  # Columna Dato
+                  elif col_idx == col_dato_idx:
+                      if celda.value is not None:
+                          celda.fill = azul_claro
+
+          wb.save(archivo_salida)
+          print(f'[+] ✓ Archivo filtrado formateado y guardado')
+
+          EOF
+
       - name: 🔧 Configurar Git
         run: |
           git config --global user.email "action@github.com"
