@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import sys
+import json
 from datetime import datetime
 
 # Configurar codificación UTF-8 para stdout
@@ -36,6 +37,16 @@ def generar_informe_html():
             "Dato"
         ]
 
+        # Obtener valores únicos para los selects
+        filtros_unicos = {}
+        for campo in campos_filtro:
+            if campo in df.columns:
+                valores = sorted([str(v) for v in df[campo].unique() if v != ""])
+                filtros_unicos[campo] = valores
+
+        # Convertir datos a JSON para JavaScript
+        datos_json = df.to_json(orient='records', default_handler=str)
+
         # Crear HTML
         html_content = f"""<!DOCTYPE html>
 <html lang="es">
@@ -43,8 +54,6 @@ def generar_informe_html():
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Informe de Resistencia de Concretos</title>
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css">
     <style>
         * {{
             margin: 0;
@@ -60,7 +69,7 @@ def generar_informe_html():
         }}
 
         .container {{
-            max-width: 1600px;
+            max-width: 1800px;
             margin: 0 auto;
             background: white;
             border-radius: 10px;
@@ -110,8 +119,9 @@ def generar_informe_html():
 
         .filtros-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 15px;
+            margin-bottom: 15px;
         }}
 
         .filtro-grupo {{
@@ -126,16 +136,16 @@ def generar_informe_html():
             font-size: 0.95em;
         }}
 
-        .filtro-grupo input,
         .filtro-grupo select {{
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 0.95em;
             transition: border-color 0.3s;
+            background-color: white;
+            cursor: pointer;
         }}
 
-        .filtro-grupo input:focus,
         .filtro-grupo select:focus {{
             outline: none;
             border-color: #667eea;
@@ -145,7 +155,6 @@ def generar_informe_html():
         .botones-filtro {{
             display: flex;
             gap: 10px;
-            margin-top: 15px;
             flex-wrap: wrap;
         }}
 
@@ -181,12 +190,12 @@ def generar_informe_html():
 
         .tabla-section {{
             overflow-x: auto;
+            margin-top: 20px;
         }}
 
         table {{
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
         }}
 
         thead {{
@@ -202,7 +211,7 @@ def generar_informe_html():
             text-align: left;
             font-weight: 600;
             border: 1px solid #1F4788;
-            font-size: 0.95em;
+            font-size: 0.9em;
         }}
 
         tbody tr {{
@@ -211,12 +220,12 @@ def generar_informe_html():
         }}
 
         tbody tr:hover {{
-            background: #f8f9fa;
+            background: #f0f0f0;
         }}
 
         tbody td {{
             padding: 10px 12px;
-            font-size: 0.95em;
+            font-size: 0.9em;
         }}
 
         tbody tr:nth-child(even) {{
@@ -231,10 +240,6 @@ def generar_informe_html():
             background: #ADD8E6 !important;
         }}
 
-        .resaltado {{
-            font-weight: 600;
-        }}
-
         .info-tabla {{
             display: flex;
             justify-content: space-between;
@@ -247,45 +252,38 @@ def generar_informe_html():
             font-size: 0.9em;
         }}
 
-        .dataTables_filter {{
-            display: none;
-        }}
-
-        .dataTables_length {{
-            display: none;
-        }}
-
-        .dataTables_info {{
-            color: #666;
-            font-size: 0.9em;
-        }}
-
         .paginacion {{
-            margin-top: 20px;
             display: flex;
             justify-content: center;
             gap: 5px;
+            margin-top: 20px;
         }}
 
-        .paginacion a,
-        .paginacion span {{
+        .paginacion button {{
             padding: 8px 12px;
             border: 1px solid #ddd;
+            background: white;
+            color: #333;
             border-radius: 5px;
             cursor: pointer;
             transition: all 0.3s;
         }}
 
-        .paginacion a:hover {{
+        .paginacion button:hover {{
             background: #667eea;
             color: white;
             border-color: #667eea;
         }}
 
-        .paginacion .active {{
+        .paginacion button.active {{
             background: #667eea;
             color: white;
             border-color: #667eea;
+        }}
+
+        .paginacion button:disabled {{
+            opacity: 0.5;
+            cursor: not-allowed;
         }}
 
         .no-resultados {{
@@ -318,12 +316,12 @@ def generar_informe_html():
             }}
 
             table {{
-                font-size: 0.85em;
+                font-size: 0.8em;
             }}
 
             thead th,
             tbody td {{
-                padding: 8px;
+                padding: 6px;
             }}
         }}
     </style>
@@ -331,7 +329,7 @@ def generar_informe_html():
 <body>
     <div class="container">
         <header>
-            <h1>📊 Informe de Resistencia de Concretos</h1>
+            <h1>Informe de Resistencia de Concretos</h1>
             <p class="fecha-generacion">Generado: {datetime.now().strftime('%d de %B de %Y a las %H:%M:%S')}</p>
         </header>
 
@@ -340,37 +338,89 @@ def generar_informe_html():
             <div class="filtros-grid">
                 <div class="filtro-grupo">
                     <label for="filtro-proyecto">Proyecto</label>
-                    <input type="text" id="filtro-proyecto" placeholder="Buscar proyecto...">
+                    <select id="filtro-proyecto">
+                        <option value="">-- Todos --</option>
+"""
+
+        # Agregar opciones para Proyecto
+        for valor in filtros_unicos.get("Proyecto", []):
+            html_content += f'                        <option value="{valor}">{valor}</option>\n'
+
+        html_content += """                    </select>
                 </div>
                 <div class="filtro-grupo">
                     <label for="filtro-localizacion">Localización</label>
-                    <input type="text" id="filtro-localizacion" placeholder="Buscar localización...">
+                    <select id="filtro-localizacion">
+                        <option value="">-- Todos --</option>
+"""
+
+        # Agregar opciones para Localización
+        for valor in filtros_unicos.get("Localización", []):
+            html_content += f'                        <option value="{valor}">{valor}</option>\n'
+
+        html_content += """                    </select>
                 </div>
                 <div class="filtro-grupo">
                     <label for="filtro-edad">Edad (días)</label>
-                    <input type="number" id="filtro-edad" placeholder="Buscar edad...">
+                    <select id="filtro-edad">
+                        <option value="">-- Todos --</option>
+"""
+
+        # Agregar opciones para Edad
+        for valor in filtros_unicos.get("Edad (días)", []):
+            html_content += f'                        <option value="{valor}">{valor}</option>\n'
+
+        html_content += """                    </select>
                 </div>
                 <div class="filtro-grupo">
                     <label for="filtro-resistencia-nominal">Resistencia nominal (MPa)</label>
-                    <input type="number" id="filtro-resistencia-nominal" placeholder="Buscar resistencia...">
+                    <select id="filtro-resistencia-nominal">
+                        <option value="">-- Todos --</option>
+"""
+
+        # Agregar opciones para Resistencia nominal
+        for valor in filtros_unicos.get("Resistencia nominal (MPa)", []):
+            html_content += f'                        <option value="{valor}">{valor}</option>\n'
+
+        html_content += """                    </select>
                 </div>
                 <div class="filtro-grupo">
                     <label for="filtro-resistencia-individual">Resistencia (MPa) Individual</label>
-                    <input type="number" id="filtro-resistencia-individual" placeholder="Buscar valor...">
+                    <select id="filtro-resistencia-individual">
+                        <option value="">-- Todos --</option>
+"""
+
+        # Agregar opciones para Resistencia Individual
+        for valor in filtros_unicos.get("Resistencia (MPa) Individual", [])[:100]:  # Limitar a 100 opciones
+            html_content += f'                        <option value="{valor}">{valor}</option>\n'
+
+        html_content += """                    </select>
                 </div>
                 <div class="filtro-grupo">
                     <label for="filtro-dato">Dato</label>
-                    <input type="text" id="filtro-dato" placeholder="Buscar dato...">
+                    <select id="filtro-dato">
+                        <option value="">-- Todos --</option>
+"""
+
+        # Agregar opciones para Dato
+        for valor in filtros_unicos.get("Dato", []):
+            html_content += f'                        <option value="{valor}">{valor}</option>\n'
+
+        html_content += """                    </select>
                 </div>
             </div>
             <div class="botones-filtro">
-                <button class="btn-filtrar" onclick="aplicarFiltros()">🔍 Aplicar Filtros</button>
-                <button class="btn-limpiar" onclick="limpiarFiltros()">🗑️ Limpiar Filtros</button>
+                <button class="btn-filtrar" onclick="aplicarFiltros()">Aplicar Filtros</button>
+                <button class="btn-limpiar" onclick="limpiarFiltros()">Limpiar Filtros</button>
             </div>
         </div>
 
+        <div id="info-tabla" class="info-tabla">
+            <span id="info-texto">Cargando datos...</span>
+        </div>
+
         <div class="tabla-section">
-            <table id="tabla-datos" class="display">
+            <table id="tabla-datos">
                 <thead>
                     <tr>
 """
@@ -381,92 +431,62 @@ def generar_informe_html():
 
         html_content += """                    </tr>
                 </thead>
-                <tbody>
-"""
-
-        # Agregar datos
-        for idx, row in df.iterrows():
-            html_content += "                    <tr>\n"
-            for col in df.columns:
-                valor = str(row[col]) if row[col] != "" else ""
-                # Aplicar colores según el tipo de dato (simplificado)
-                clase = ""
-                if col in ["Resistencia (MPa) Individual", "Resistencia (%) Individual", "Conteo Elementos"]:
-                    clase = 'class="datos-azules"'
-                elif col in ["Proyecto", "Cilindro Nº", "Código de mezcla", "Localización", "Toma", "Rotura", "Edad (días)", "Resistencia nominal (MPa)", "Resistencia (%)", "TIPO"]:
-                    clase = 'class="datos-verdes"'
-
-                html_content += f'                        <td {clase}>{valor}</td>\n'
-            html_content += "                    </tr>\n"
-
-        html_content += """                </tbody>
+                <tbody id="tabla-body">
+                </tbody>
             </table>
         </div>
 
-        <div id="info-tabla" class="info-tabla">
-            <span id="info-texto">Mostrando todos los registros</span>
-        </div>
+        <div class="paginacion" id="paginacion"></div>
 
         <footer>
             <p>Sistema de Información de Resistencia de Concretos - INGEURBE</p>
         </footer>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script>
-        let table;
+        // Datos globales
+        const todosDatos = {datos_json};
+        let datosFiltrados = todosDatos;
+        const registrosPorPagina = 50;
+        let paginaActual = 1;
 
-        $(document).ready(function() {
-            table = $('#tabla-datos').DataTable({
-                language: {
-                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
-                },
-                pageLength: 25,
-                dom: '<"top"lf>rt<"bottom"ip>',
-                columnDefs: [
-                    { responsivePriority: 1, targets: 0 },
-                    { responsivePriority: 2, targets: -1 }
-                ]
-            });
+        // Índices de columnas para colores
+        const columnasVerdes = {json.dumps([i for i, col in enumerate(df.columns) if col in ['Resistencia (%)', 'Proyecto', 'TIPO', 'Cilindro Nº', 'Código de mezcla', 'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)']])};
+        const columnasAzules = {json.dumps([i for i, col in enumerate(df.columns) if col in ['Resistencia (MPa) Individual', 'Resistencia (%) Individual', 'Conteo Elementos']])};
+        const nombresColumnas = {json.dumps(df.columns.tolist())};
 
-            // Ocultar la búsqueda global
-            $('.dataTables_filter').hide();
-        });
+        // Inicializar tabla
+        document.addEventListener('DOMContentLoaded', function() {{
+            mostrarPagina(1);
+            configurarPaginacion();
+        }});
 
-        function aplicarFiltros() {
-            const proyecto = document.getElementById('filtro-proyecto').value.toLowerCase();
-            const localizacion = document.getElementById('filtro-localizacion').value.toLowerCase();
-            const edad = document.getElementById('filtro-edad').value;
-            const resistenciaNominal = document.getElementById('filtro-resistencia-nominal').value;
-            const resistenciaIndividual = document.getElementById('filtro-resistencia-individual').value;
-            const dato = document.getElementById('filtro-dato').value.toLowerCase();
+        function aplicarFiltros() {{
+            const filtros = {{
+                proyecto: document.getElementById('filtro-proyecto').value,
+                localizacion: document.getElementById('filtro-localizacion').value,
+                edad: document.getElementById('filtro-edad').value,
+                resistenciaNominal: document.getElementById('filtro-resistencia-nominal').value,
+                resistenciaIndividual: document.getElementById('filtro-resistencia-individual').value,
+                dato: document.getElementById('filtro-dato').value
+            }};
 
-            $.fn.dataTable.ext.search.push(
-                function(settings, data, dataIndex) {
-                    const proyectoCol = data[0].toLowerCase();
-                    const localizacionCol = data[3].toLowerCase();
-                    const edadCol = data[6];
-                    const resistenciaNominalCol = data[7];
-                    const resistenciaIndividualCol = data[9];
-                    const datoCol = data[data.length - 1].toLowerCase();
+            datosFiltrados = todosDatos.filter(row => {{
+                if (filtros.proyecto && String(row['Proyecto']) !== filtros.proyecto) return false;
+                if (filtros.localizacion && String(row['Localización']) !== filtros.localizacion) return false;
+                if (filtros.edad && String(row['Edad (días)']) !== filtros.edad) return false;
+                if (filtros.resistenciaNominal && String(row['Resistencia nominal (MPa)']) !== filtros.resistenciaNominal) return false;
+                if (filtros.resistenciaIndividual && String(row['Resistencia (MPa) Individual']) !== filtros.resistenciaIndividual) return false;
+                if (filtros.dato && String(row['Dato']) !== filtros.dato) return false;
+                return true;
+            }});
 
-                    if (proyecto && proyectoCol.indexOf(proyecto) === -1) return false;
-                    if (localizacion && localizacionCol.indexOf(localizacion) === -1) return false;
-                    if (edad && edadCol !== edad) return false;
-                    if (resistenciaNominal && resistenciaNominalCol !== resistenciaNominal) return false;
-                    if (resistenciaIndividual && resistenciaIndividualCol !== resistenciaIndividual) return false;
-                    if (dato && datoCol.indexOf(dato) === -1) return false;
+            paginaActual = 1;
+            mostrarPagina(1);
+            configurarPaginacion();
+        }}
 
-                    return true;
-                }
-            );
-
-            table.draw();
-            actualizarInfo();
-        }
-
-        function limpiarFiltros() {
+        function limpiarFiltros() {{
             document.getElementById('filtro-proyecto').value = '';
             document.getElementById('filtro-localizacion').value = '';
             document.getElementById('filtro-edad').value = '';
@@ -474,16 +494,118 @@ def generar_informe_html():
             document.getElementById('filtro-resistencia-individual').value = '';
             document.getElementById('filtro-dato').value = '';
 
-            $.fn.dataTable.ext.search.length = 0;
-            table.draw();
-            actualizarInfo();
-        }
+            datosFiltrados = todosDatos;
+            paginaActual = 1;
+            mostrarPagina(1);
+            configurarPaginacion();
+        }}
 
-        function actualizarInfo() {
-            const info = table.page.info();
-            const texto = `Mostrando ${{info.start + 1}} a ${{info.end}} de ${{info.recordsDisplay}} registros`;
+        function mostrarPagina(numero) {{
+            paginaActual = numero;
+            const inicio = (numero - 1) * registrosPorPagina;
+            const fin = inicio + registrosPorPagina;
+            const registrosPagina = datosFiltrados.slice(inicio, fin);
+
+            const tbody = document.getElementById('tabla-body');
+            tbody.innerHTML = '';
+
+            if (registrosPagina.length === 0) {{
+                tbody.innerHTML = '<tr><td colspan="' + nombresColumnas.length + '" class="no-resultados">No se encontraron registros</td></tr>';
+                actualizarInfo();
+                return;
+            }}
+
+            registrosPagina.forEach(row => {{
+                const tr = document.createElement('tr');
+                nombresColumnas.forEach((col, idx) => {{
+                    const td = document.createElement('td');
+                    const valor = row[col] !== null && row[col] !== undefined ? String(row[col]) : '';
+                    td.textContent = valor;
+
+                    if (columnasVerdes.includes(idx)) {{
+                        td.className = 'datos-verdes';
+                    }} else if (columnasAzules.includes(idx)) {{
+                        td.className = 'datos-azules';
+                    }}
+
+                    tr.appendChild(td);
+                }});
+                tbody.appendChild(tr);
+            }});
+
+            actualizarInfo();
+        }}
+
+        function configurarPaginacion() {{
+            const totalPaginas = Math.ceil(datosFiltrados.length / registrosPorPagina);
+            const paginacionDiv = document.getElementById('paginacion');
+            paginacionDiv.innerHTML = '';
+
+            if (totalPaginas <= 1) return;
+
+            // Botón anterior
+            const btnAnterior = document.createElement('button');
+            btnAnterior.textContent = '← Anterior';
+            btnAnterior.disabled = paginaActual === 1;
+            btnAnterior.onclick = () => {{
+                if (paginaActual > 1) mostrarPagina(paginaActual - 1);
+            }};
+            paginacionDiv.appendChild(btnAnterior);
+
+            // Números de página
+            const inicio = Math.max(1, paginaActual - 2);
+            const fin = Math.min(totalPaginas, paginaActual + 2);
+
+            if (inicio > 1) {{
+                const btn1 = document.createElement('button');
+                btn1.textContent = '1';
+                btn1.onclick = () => mostrarPagina(1);
+                paginacionDiv.appendChild(btn1);
+
+                if (inicio > 2) {{
+                    const puntos = document.createElement('span');
+                    puntos.textContent = '...';
+                    paginacionDiv.appendChild(puntos);
+                }}
+            }}
+
+            for (let i = inicio; i <= fin; i++) {{
+                const btn = document.createElement('button');
+                btn.textContent = i;
+                if (i === paginaActual) btn.className = 'active';
+                btn.onclick = () => mostrarPagina(i);
+                paginacionDiv.appendChild(btn);
+            }}
+
+            if (fin < totalPaginas) {{
+                if (fin < totalPaginas - 1) {{
+                    const puntos = document.createElement('span');
+                    puntos.textContent = '...';
+                    paginacionDiv.appendChild(puntos);
+                }}
+
+                const btnUltima = document.createElement('button');
+                btnUltima.textContent = totalPaginas;
+                btnUltima.onclick = () => mostrarPagina(totalPaginas);
+                paginacionDiv.appendChild(btnUltima);
+            }}
+
+            // Botón siguiente
+            const btnSiguiente = document.createElement('button');
+            btnSiguiente.textContent = 'Siguiente →';
+            btnSiguiente.disabled = paginaActual === totalPaginas;
+            btnSiguiente.onclick = () => {{
+                if (paginaActual < totalPaginas) mostrarPagina(paginaActual + 1);
+            }};
+            paginacionDiv.appendChild(btnSiguiente);
+        }}
+
+        function actualizarInfo() {{
+            const inicio = (paginaActual - 1) * registrosPorPagina + 1;
+            const fin = Math.min(paginaActual * registrosPorPagina, datosFiltrados.length);
+            const texto = `Mostrando ${{inicio}} a ${{fin}} de ${{datosFiltrados.length}} registros (Total: ${{todosDatos.length}})`;
             document.getElementById('info-texto').textContent = texto;
-        }
+        }}
     </script>
 </body>
 </html>
@@ -493,8 +615,9 @@ def generar_informe_html():
         with open(ruta_salida, 'w', encoding='utf-8') as f:
             f.write(html_content)
 
-        print(f"[+] ✓ Informe HTML generado: {ruta_salida}")
+        print(f"[+] Informe HTML generado: {ruta_salida}")
         print(f"[+] Registros incluidos: {len(df)}")
+        print(f"[+] Filtros disponibles: {len(filtros_unicos)}")
         return True
 
     except Exception as e:
