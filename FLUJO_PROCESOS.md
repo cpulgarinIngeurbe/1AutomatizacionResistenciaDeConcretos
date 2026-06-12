@@ -103,20 +103,27 @@
 ```
 Workflow: 🚀 ORQUESTADOR - Flujo Completo Automatizado
 
-Pasos:
+Pasos automatizados:
 1. Ve a Actions → ORQUESTADOR
 2. Haz clic en "Run workflow"
 3. Selecciona qué pasos ejecutar (todos están habilitados por defecto)
 4. Haz clic en "Run workflow"
 
-El orquestador:
+El orquestador ejecuta:
+  PASO 1: Descarga de datos SGS (5-10 min)
+  PASO 2: Transformación de datos (3-4 min)
+  PASO 3: Generación de informe (1-2 min)
+
+Características:
 ✓ Ejecuta cada workflow de forma SECUENCIAL
 ✓ Espera a que cada uno termine antes de ejecutar el siguiente
 ✓ Muestra progreso en tiempo real
 ✓ Aborta si algún paso falla
 ✓ Genera reporte final
 
-Tiempo total aproximado: 45-60 minutos
+Tiempo total aproximado: 10-20 minutos
+
+Nota: El enriquecimiento teórico queda fuera (se ejecuta manualmente si es necesario)
 ```
 
 ---
@@ -166,26 +173,25 @@ Tiempo total aproximado: 45-60 minutos
 ## 📋 Dependencias entre Workflows
 
 ```
-                        ┌─────────────────────────────────┐
-                        │  🚀 ORQUESTADOR (RECOMENDADO)   │
-                        │  Ejecuta TODO secuencialmente   │
-                        └──────────────┬──────────────────┘
-                                       │
-                ┌──────────────────────┼──────────────────────┐
-                │                      │                      │
-                ▼                      ▼                      ▼
-        descargas-sgs.yml      transformar.yml     enriquecer-consolidado-teoricas.yml
-                │                      │                      │
-                └──────────────────────┼──────────────────────┘
-                                       │
-                                       ▼
-                            generar-informe.yml
-                                       │
-                                       ▼
-                              GitHub Pages (auto)
-                                       │
-                                       ▼
-                            📊 index.html DISPONIBLE
+                    ┌──────────────────────────────────┐
+                    │ 🚀 ORQUESTADOR (RECOMENDADO)     │
+                    │ Ejecuta secuencialmente           │
+                    └──────────────┬─────────────────┘
+                                   │
+                ┌──────────────────┼──────────────────┐
+                │                  │                  │
+                ▼                  ▼                  ▼
+        descargas-sgs.yml   transformar.yml   generar-informe.yml
+                │                  │                  │
+                └──────────────────┼──────────────────┘
+                                   │
+                                   ▼
+                          GitHub Pages (auto)
+                                   │
+                                   ▼
+                        📊 index.html DISPONIBLE
+
+Nota: enriquecer-consolidado-teoricas.yml queda manual (opcional)
 ```
 
 ---
