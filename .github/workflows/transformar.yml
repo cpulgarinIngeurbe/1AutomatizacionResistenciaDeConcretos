@@ -465,10 +465,6 @@ jobs:
 
           EOF
 
-      - name: 📄 Generar informe HTML
-        run: |
-          python generar_informe_html.py
-
       - name: 🔧 Configurar Git
         run: |
           git config --global user.email "action@github.com"
@@ -478,7 +474,7 @@ jobs:
         env:
           RESISTENCIA_CONCRETOS_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
         run: |
-          git add datos/ DatosTransformados/ index.html
+          git add datos/ DatosTransformados/
 
           if git diff --quiet --cached; then
             echo "[*] Sin cambios nuevos"

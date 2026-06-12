@@ -1,0 +1,63 @@
+name: 📄 Generar Informe HTML
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["📊 Transformar Datos - Concrelab + SGS"]
+    types:
+      - completed
+
+jobs:
+  generar-informe:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+
+      - name: 🐍 Configurar Python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: 📦 Instalar dependencias
+        run: |
+          pip install pandas openpyxl
+
+      - name: 📄 Generar informe HTML
+        run: |
+          python generar_informe_html.py
+
+      - name: 🔧 Configurar Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action Bot"
+
+      - name: 🚀 Commit y Push del informe
+        env:
+          RESISTENCIA_CONCRETOS_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+        run: |
+          git add index.html
+
+          if git diff --quiet --cached; then
+            echo "[*] Sin cambios en el informe"
+          else
+            git commit -m "[AUTO] Generar informe HTML - $(date '+%Y-%m-%d %H:%M:%S')"
+            git push origin main
+            echo "[+] ✓ Informe actualizado y desplegado"
+          fi
+
+      - name: 📊 Reporte final
+        if: always()
+        run: |
+          echo "=== GENERACIÓN DE INFORME COMPLETADA ==="
+          echo ""
+          echo "📄 Archivo generado:"
+          ls -lh index.html
+          echo ""
+          echo "✅ El informe está disponible en GitHub Pages"
+          echo ""
+          echo "Últimos commits:"
+          git log --oneline -3
