@@ -528,10 +528,10 @@ jobs:
               total = len(df_transformado)
               print(f'[+] Coincidencias encontradas: {coincidencias}/{total}')
 
-              # Crear nueva columna "Cumplimiento norma b" = Dato - Resistencia Promedio
+              # Crear nueva columna "Cumplimiento norma b" = Dato - Resistencia Promedio (MPa)
               # Si Dato está vacío, el resultado es "NoValido"
               df_transformado['Cumplimiento norma b'] = df_transformado.apply(
-                  lambda row: 'NoValido' if pd.isna(row['Dato']) else row['Dato'] - row['Resistencia Promedio'],
+                  lambda row: 'NoValido' if pd.isna(row['Dato']) else row['Dato'] - row['Resistencia Promedio (MPa)'],
                   axis=1
               )
               print(f'[+] Columna "Cumplimiento norma b" calculada')
