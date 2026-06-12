@@ -96,6 +96,31 @@
 
 ---
 
+## 🚀 NUEVO: Orquestador Automatizado
+
+### **Recomendado - Ejecutar TODO en un solo clic**
+
+```
+Workflow: 🚀 ORQUESTADOR - Flujo Completo Automatizado
+
+Pasos:
+1. Ve a Actions → ORQUESTADOR
+2. Haz clic en "Run workflow"
+3. Selecciona qué pasos ejecutar (todos están habilitados por defecto)
+4. Haz clic en "Run workflow"
+
+El orquestador:
+✓ Ejecuta cada workflow de forma SECUENCIAL
+✓ Espera a que cada uno termine antes de ejecutar el siguiente
+✓ Muestra progreso en tiempo real
+✓ Aborta si algún paso falla
+✓ Genera reporte final
+
+Tiempo total aproximado: 45-60 minutos
+```
+
+---
+
 ## 🔄 Secuencia Recomendada de Ejecución Manual
 
 ### **Opción 1: Flujo Completo (Desde el inicio)**
@@ -141,17 +166,26 @@
 ## 📋 Dependencias entre Workflows
 
 ```
-descargas-sgs.yml
-       │
-       └──→ transformar.yml (manual - incluye JOIN integrado)
-              │
-              ├──→ enriquecer-consolidado-teoricas.yml (manual)
-              │
-              └──→ generar-informe.yml (automático + manual)
-                     │
-                     └──→ GitHub Pages (automático)
-                            │
-                            └──→ index.html DISPONIBLE
+                        ┌─────────────────────────────────┐
+                        │  🚀 ORQUESTADOR (RECOMENDADO)   │
+                        │  Ejecuta TODO secuencialmente   │
+                        └──────────────┬──────────────────┘
+                                       │
+                ┌──────────────────────┼──────────────────────┐
+                │                      │                      │
+                ▼                      ▼                      ▼
+        descargas-sgs.yml      transformar.yml     enriquecer-consolidado-teoricas.yml
+                │                      │                      │
+                └──────────────────────┼──────────────────────┘
+                                       │
+                                       ▼
+                            generar-informe.yml
+                                       │
+                                       ▼
+                              GitHub Pages (auto)
+                                       │
+                                       ▼
+                            📊 index.html DISPONIBLE
 ```
 
 ---
@@ -200,10 +234,11 @@ descargas-sgs.yml
 
 | Workflow | Entrada | Proceso | Salida | Trigger |
 |----------|---------|---------|--------|---------|
-| descargas-sgs | URLs + credenciales | Web scraping | datos/*.xlsx | Manual |
-| transformar | datos/*.xlsx + Teóricas | Transformación + JOIN + enriquecimiento | Consolidado con Dato + Cumplimiento norma b | Manual |
-| enriquecer | Datos teóricos | Agrega PK | ConsolidadoResistenciaTeoricas.xlsx | Manual |
-| generar-informe | Consolidado | Genera HTML | index.html | Auto + Manual |
+| 🚀 orquestador | (ninguna) | Orquesta secuencialmente todos los workflows | Reporte final | Manual |
+| descargas-sgs | URLs + credenciales | Web scraping | datos/*.xlsx | Manual / Orquestador |
+| transformar | datos/*.xlsx + Teóricas | Transformación + JOIN + enriquecimiento | Consolidado con Dato + Cumplimiento norma b | Manual / Orquestador |
+| enriquecer | Datos teóricos | Agrega PK | ConsolidadoResistenciaTeoricas.xlsx | Manual / Orquestador |
+| generar-informe | Consolidado | Genera HTML | index.html | Manual / Orquestador |
 | GitHub Pages | index.html | Despliega | URL pública | Auto |
 
 ---
