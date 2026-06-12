@@ -28,6 +28,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
+          fetch-depth: 0
+
+      - name: 🔧 Configurar Git
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action Bot"
 
       - name: "📊 PASO 1: Descarga de datos SGS"
         if: ${{ inputs.ejecutar_descarga == true }}
@@ -81,6 +87,12 @@ jobs:
             exit 1
           fi
 
+      - name: 🔄 Sincronizar datos después de PASO 1
+        run: |
+          echo "[*] Sincronizando datos desde repositorio remoto..."
+          git pull origin main --no-edit
+          echo "[+] ✓ Datos sincronizados"
+
       - name: "📈 PASO 2: Transformación de datos"
         if: ${{ inputs.ejecutar_transformacion == true }}
         env:
@@ -132,6 +144,12 @@ jobs:
             echo "[!] ✗ TIMEOUT: Transformación se tardó más de 20 minutos"
             exit 1
           fi
+
+      - name: 🔄 Sincronizar datos después de PASO 2
+        run: |
+          echo "[*] Sincronizando datos desde repositorio remoto..."
+          git pull origin main --no-edit
+          echo "[+] ✓ Datos sincronizados"
 
       - name: "📄 PASO 3: Generación de informe"
         if: ${{ inputs.ejecutar_informe == true }}
