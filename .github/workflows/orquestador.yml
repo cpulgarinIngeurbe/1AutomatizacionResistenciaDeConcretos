@@ -26,27 +26,24 @@ jobs:
     steps:
       - name: 📥 Clonar repositorio
         uses: actions/checkout@v4
-
-      - name: 🔧 Configurar GitHub CLI
-        run: |
-          gh auth login --with-token <<< "${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}"
+        with:
+          token: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
 
       - name: "📊 PASO 1: Descarga de datos SGS"
         if: ${{ inputs.ejecutar_descarga == true }}
+        env:
+          GH_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
         run: |
           echo "==================================="
           echo "🔄 Iniciando DESCARGA DE DATOS SGS"
           echo "==================================="
 
-          RUN_ID=$(gh workflow run descargas-sgs.yml --repo ${{ github.repository }} --ref main --json id -q '.id' 2>/dev/null || echo "")
-
-          if [ -z "$RUN_ID" ]; then
-            echo "[*] Disparando workflow descargas-sgs.yml..."
-            RUN_ID=$(gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/descargas-sgs.yml/dispatches \
-              -X POST \
-              -f ref=main \
-              --input /dev/null 2>&1 | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
-          fi
+          echo "[*] Disparando workflow descargas-sgs.yml..."
+          curl -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/descargas-sgs.yml/dispatches \
+            -d '{"ref":"main"}'
 
           echo "[*] Esperando a que descargas-sgs.yml se complete..."
 
@@ -56,9 +53,13 @@ jobs:
           INTERVAL=30
 
           while [ $ELAPSED -lt $TIMEOUT ]; do
-            LATEST_RUN=$(gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/descargas-sgs.yml/runs?per_page=1 --jq '.workflow_runs[0]')
-            STATUS=$(echo $LATEST_RUN | jq -r '.status')
-            CONCLUSION=$(echo $LATEST_RUN | jq -r '.conclusion')
+            RESPONSE=$(curl -s \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/actions/workflows/descargas-sgs.yml/runs?per_page=1)
+
+            STATUS=$(echo $RESPONSE | jq -r '.workflow_runs[0].status // "unknown"')
+            CONCLUSION=$(echo $RESPONSE | jq -r '.workflow_runs[0].conclusion // "unknown"')
 
             if [ "$STATUS" = "completed" ]; then
               if [ "$CONCLUSION" = "success" ]; then
@@ -82,14 +83,19 @@ jobs:
 
       - name: "📈 PASO 2: Transformación de datos"
         if: ${{ inputs.ejecutar_transformacion == true }}
+        env:
+          GH_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
         run: |
           echo "==================================="
           echo "🔄 Iniciando TRANSFORMACIÓN DE DATOS"
           echo "==================================="
 
-          gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/transformar.yml/dispatches \
-            -X POST \
-            -f ref=main
+          echo "[*] Disparando workflow transformar.yml..."
+          curl -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/transformar.yml/dispatches \
+            -d '{"ref":"main"}'
 
           echo "[*] Esperando a que transformar.yml se complete..."
 
@@ -99,9 +105,13 @@ jobs:
           INTERVAL=20
 
           while [ $ELAPSED -lt $TIMEOUT ]; do
-            LATEST_RUN=$(gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/transformar.yml/runs?per_page=1 --jq '.workflow_runs[0]')
-            STATUS=$(echo $LATEST_RUN | jq -r '.status')
-            CONCLUSION=$(echo $LATEST_RUN | jq -r '.conclusion')
+            RESPONSE=$(curl -s \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/actions/workflows/transformar.yml/runs?per_page=1)
+
+            STATUS=$(echo $RESPONSE | jq -r '.workflow_runs[0].status // "unknown"')
+            CONCLUSION=$(echo $RESPONSE | jq -r '.workflow_runs[0].conclusion // "unknown"')
 
             if [ "$STATUS" = "completed" ]; then
               if [ "$CONCLUSION" = "success" ]; then
@@ -125,14 +135,19 @@ jobs:
 
       - name: "📄 PASO 3: Generación de informe"
         if: ${{ inputs.ejecutar_informe == true }}
+        env:
+          GH_TOKEN: ${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}
         run: |
           echo "==================================="
           echo "🔄 Iniciando GENERACIÓN DE INFORME"
           echo "==================================="
 
-          gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/generar-informe.yml/dispatches \
-            -X POST \
-            -f ref=main
+          echo "[*] Disparando workflow generar-informe.yml..."
+          curl -X POST \
+            -H "Authorization: token $GH_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/actions/workflows/generar-informe.yml/dispatches \
+            -d '{"ref":"main"}'
 
           echo "[*] Esperando a que generar-informe.yml se complete..."
 
@@ -142,9 +157,13 @@ jobs:
           INTERVAL=10
 
           while [ $ELAPSED -lt $TIMEOUT ]; do
-            LATEST_RUN=$(gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/generar-informe.yml/runs?per_page=1 --jq '.workflow_runs[0]')
-            STATUS=$(echo $LATEST_RUN | jq -r '.status')
-            CONCLUSION=$(echo $LATEST_RUN | jq -r '.conclusion')
+            RESPONSE=$(curl -s \
+              -H "Authorization: token $GH_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              https://api.github.com/repos/${{ github.repository }}/actions/workflows/generar-informe.yml/runs?per_page=1)
+
+            STATUS=$(echo $RESPONSE | jq -r '.workflow_runs[0].status // "unknown"')
+            CONCLUSION=$(echo $RESPONSE | jq -r '.workflow_runs[0].conclusion // "unknown"')
 
             if [ "$STATUS" = "completed" ]; then
               if [ "$CONCLUSION" = "success" ]; then
