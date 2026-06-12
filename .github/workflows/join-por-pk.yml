@@ -86,24 +86,30 @@ jobs:
               total = len(df_transformado)
               print(f'[+] Coincidencias encontradas: {coincidencias}/{total}')
 
+              # Crear nueva columna "Cumplimiento norma b" = Dato - Resistencia Promedio
+              df_transformado['Cumplimiento norma b'] = df_transformado['Dato'] - df_transformado['Resistencia Promedio']
+              print(f'[+] Columna "Cumplimiento norma b" calculada')
+
               # Limpiar columnas temporales
               df_transformado = df_transformado.drop(columns=['Resistencia_int', 'join_key'])
 
               # Guardar archivo
               df_transformado.to_excel(archivo_transformado, index=False)
-              print(f'[+] Archivo guardado con columna Dato')
+              print(f'[+] Archivo guardado con columnas Dato y Cumplimiento norma b')
 
               # Aplicar formateo
               print(f'[+] Aplicando formateo')
               wb = load_workbook(archivo_transformado)
               ws = wb.active
 
-              # Obtener índice de columna Dato
+              # Obtener índices de columnas Dato y Cumplimiento norma b
               col_dato_idx = None
+              col_cumplimiento_idx = None
               for col_num, col_letter in enumerate(ws.columns, 1):
                   if ws.cell(1, col_num).value == 'Dato':
                       col_dato_idx = col_num
-                      break
+                  elif ws.cell(1, col_num).value == 'Cumplimiento norma b':
+                      col_cumplimiento_idx = col_num
 
               if col_dato_idx:
                   # Colores
@@ -124,6 +130,24 @@ jobs:
                           celda.fill = azul_claro
                       else:
                           celda.fill = rojo
+
+              # Colorear columna Cumplimiento norma b
+              if col_cumplimiento_idx:
+                  # Colores
+                  azul_claro = PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+                  azul_militar = PatternFill(start_color="1F4788", end_color="1F4788", fill_type="solid")
+                  blanco = Font(color="FFFFFF")
+
+                  # Colorear encabezado
+                  celda_header = ws.cell(1, col_cumplimiento_idx)
+                  celda_header.fill = azul_militar
+                  celda_header.font = blanco
+
+                  # Colorear datos (si tienen valor)
+                  for row in range(2, ws.max_row + 1):
+                      celda = ws.cell(row, col_cumplimiento_idx)
+                      if celda.value is not None:
+                          celda.fill = azul_claro
 
               wb.save(archivo_transformado)
               print(f'[+] Formateo completado')

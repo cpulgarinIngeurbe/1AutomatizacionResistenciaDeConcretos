@@ -53,7 +53,7 @@ def generar_informe_html():
             'Localización', 'Toma', 'Rotura', 'Edad (días)', 'Resistencia nominal (MPa)'
         ]]
         columnas_azules_idx = [i for i, col in enumerate(df.columns) if col in [
-            'Resistencia (MPa) Individual', 'Resistencia (%) Individual', 'Conteo Elementos'
+            'Resistencia (MPa) Individual', 'Resistencia (%) Individual', 'Conteo Elementos', 'Cumplimiento norma b'
         ]]
         nombres_columnas = df.columns.tolist()
         fecha_generacion = datetime.now().strftime('%d de %B de %Y a las %H:%M:%S')
