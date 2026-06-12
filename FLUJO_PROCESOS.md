@@ -19,23 +19,28 @@
                                   │
                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ 2️⃣  TRANSFORMAR.yml (Concrelab + SGS)                                  │
+│ 2️⃣  TRANSFORMAR.yml (Concrelab + SGS + JOIN + Teóricas)                │
 │ ─────────────────────────────────────────────────────────────────────   │
 │ • Trigger: Manual (workflow_dispatch) O automático después descarga     │
-│ • Entrada: datos/*.xlsx                                                 │
+│ • Entradas: datos/*.xlsx + ConsolidadoResistenciaTeoricas.xlsx         │
 │ • Procesa:                                                               │
+│   FASE 1 - Transformación:                                              │
 │   - Lee archivos Concrelab y SGS                                        │
 │   - Normaliza columnas                                                   │
 │   - Agrega TIPO (MURO, PLACA, etc.)                                     │
-│   - Calcula PK (Proyecto_TIPO_Resistencia_Edad)                         │
-│   - Calcula Resistencia Promedio                                        │
-│   - Calcula Conteo de Elementos                                         │
-│   - Calcula Promedio Móvil                                              │
+│   - Calcula PK, Resistencia Promedio, Conteo, Promedio Móvil          │
 │   - Aplica formateo condicional                                         │
+│   FASE 2 - JOIN:                                                        │
+│   - Lee datos teóricos                                                  │
+│   - Une por PK (clave primaria)                                         │
+│   - Agrega columna "Dato" del consolidado teórico                       │
+│   - Calcula "Cumplimiento norma b" = Dato - Resistencia Promedio      │
+│   - Si Dato está vacío → "NoValido"                                     │
+│   - Color-code: AZUL si coincide, ROJO si no encuentra match           │
 │ • Salida:                                                                │
 │   - DatosTransformados/PROYECTO_Concrelab.xlsx                          │
 │   - DatosTransformados/PROYECTO_SGS.xlsx                                │
-│   - DatosTransformados/ConsolidadoResistenciasConcretos.xlsx            │
+│   - DatosTransformados/ConsolidadoResistenciasConcretos.xlsx (enriquecido)
 │ • Commit: datos/ DatosTransformados/                                    │
 └─────────────────────────────────────────────────────────────────────────┘
                                   │
@@ -48,22 +53,6 @@
 │ • Acción: Agrega columna PK con formato estandarizado                   │
 │ • Salida: ConsolidadoResistenciaTeoricas.xlsx (enriquecido con PK)     │
 │ • Commit: ConsolidadoResistenciaTeoricas.xlsx                           │
-└─────────────────────────────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│ 4️⃣  JOIN-POR-PK.yml (Unión de datos)                                    │
-│ ─────────────────────────────────────────────────────────────────────   │
-│ • Trigger: Manual (workflow_dispatch)                                   │
-│ • Entradas:                                                              │
-│   - ConsolidadoResistenciasConcretos.xlsx (datos transformados)         │
-│   - ConsolidadoResistenciaTeoricas.xlsx (datos teóricos)                │
-│ • Acción:                                                                │
-│   - Une por PK (clave primaria)                                         │
-│   - Agrega columna "Dato" del consolidado teórico                       │
-│   - Color-code: AZUL si coincide, ROJO si no encuentra match           │
-│ • Salida: ConsolidadoResistenciasConcretos.xlsx (con columna Dato)     │
-│ • Commit: ConsolidadoResistenciasConcretos.xlsx                         │
 └─────────────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
@@ -115,29 +104,23 @@
 1. Ejecutar: descargas-sgs.yml
    ↓ (esperar 5-10 min)
    
-2. Ejecutar: transformar.yml
-   ↓ (esperar 2-3 min)
+2. Ejecutar: transformar.yml (incluye JOIN + enriquecimiento)
+   ↓ (esperar 3-4 min)
    
-3. Ejecutar: enriquecer-consolidado-teoricas.yml
+3. Ejecutar: generar-informe.yml (OPCIONAL - se ejecuta automático)
    ↓ (esperar 1 min)
    
-4. Ejecutar: join-por-pk.yml
-   ↓ (esperar 1 min)
-   
-5. Ejecutar: generar-informe.yml (OPCIONAL - se ejecuta automático)
-   ↓ (esperar 1 min)
-   
-6. Acceder a: https://usuario.github.io/nombre-repo/
+4. Acceder a: https://usuario.github.io/nombre-repo/
    ✅ Informe disponible con datos actualizados
 ```
 
 ### **Opción 2: Flujo Rápido (Solo si datos ya existen)**
 
 ```
-1. Ejecutar: transformar.yml
+1. Ejecutar: transformar.yml (incluye JOIN + enriquecimiento)
    ↓ (automático → generar-informe.yml)
    
-2. Esperar 2-3 minutos
+2. Esperar 3-4 minutos
    
 3. Acceder a: https://usuario.github.io/nombre-repo/
    ✅ Informe actualizado
@@ -160,11 +143,9 @@
 ```
 descargas-sgs.yml
        │
-       └──→ transformar.yml (manual)
+       └──→ transformar.yml (manual - incluye JOIN integrado)
               │
               ├──→ enriquecer-consolidado-teoricas.yml (manual)
-              │
-              ├──→ join-por-pk.yml (manual)
               │
               └──→ generar-informe.yml (automático + manual)
                      │
@@ -203,25 +184,15 @@ descargas-sgs.yml
 
 ---
 
-## ⚡ Optimización Recomendada
+## ⚡ Cambios Realizados
 
-### **Cambiar trigger de generar-informe.yml**
+### **Combinación de Workflows**
 
-El workflow `generar-informe.yml` actualmente se ejecuta DESPUÉS de `transformar.yml`. 
-
-**Considerar:**
-1. ¿Se ejecutan siempre en esta orden?
-2. ¿Qué pasa si ejecuto transformar.yml sin ejecutar enriquecer + join primero?
-
-**Propuesta:**
-- `generar-informe.yml` debería activarse SOLO después de `join-por-pk.yml` (que es el que agrega la columna "Dato")
-
-```yaml
-workflow_run:
-  workflows: ["join-por-pk.yml"]  # En lugar de transformar.yml
-  types:
-    - completed
-```
+- ✅ `transformar.yml` ahora integra la lógica de `join-por-pk.yml`
+- ✅ Un único workflow maneja: Transformación + JOIN + Enriquecimiento
+- ✅ Se eliminó `join-por-pk.yml` por redundancia
+- ✅ Nueva columna "Cumplimiento norma b" = Dato - Resistencia Promedio
+- ✅ Si Dato está vacío, muestra "NoValido"
 
 ---
 
@@ -230,9 +201,8 @@ workflow_run:
 | Workflow | Entrada | Proceso | Salida | Trigger |
 |----------|---------|---------|--------|---------|
 | descargas-sgs | URLs + credenciales | Web scraping | datos/*.xlsx | Manual |
-| transformar | datos/*.xlsx | Normalización + cálculos | ConsolidadoResistenciasConcretos.xlsx | Manual |
+| transformar | datos/*.xlsx + Teóricas | Transformación + JOIN + enriquecimiento | Consolidado con Dato + Cumplimiento norma b | Manual |
 | enriquecer | Datos teóricos | Agrega PK | ConsolidadoResistenciaTeoricas.xlsx | Manual |
-| join-por-pk | Consolidados | Une por PK | Consolidado + "Dato" | Manual |
 | generar-informe | Consolidado | Genera HTML | index.html | Auto + Manual |
 | GitHub Pages | index.html | Despliega | URL pública | Auto |
 
