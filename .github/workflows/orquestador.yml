@@ -1,0 +1,248 @@
+# Orquestador - Ejecuta el flujo completo paso a paso
+name: 🚀 ORQUESTADOR - Flujo Completo Automatizado
+
+on:
+  workflow_dispatch:
+    inputs:
+      ejecutar_descarga:
+        description: "Ejecutar descarga de datos SGS"
+        required: true
+        type: boolean
+        default: true
+      ejecutar_transformacion:
+        description: "Ejecutar transformación de datos"
+        required: true
+        type: boolean
+        default: true
+      ejecutar_enriquecimiento:
+        description: "Ejecutar enriquecimiento teórico"
+        required: true
+        type: boolean
+        default: true
+      ejecutar_informe:
+        description: "Ejecutar generación de informe"
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  orquestar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Clonar repositorio
+        uses: actions/checkout@v4
+
+      - name: 🔧 Configurar GitHub CLI
+        run: |
+          gh auth login --with-token <<< "${{ secrets.RESISTENCIA_CONCRETOS_TOKEN }}"
+
+      - name: "📊 PASO 1: Descarga de datos SGS"
+        if: ${{ inputs.ejecutar_descarga == true }}
+        run: |
+          echo "==================================="
+          echo "🔄 Iniciando DESCARGA DE DATOS SGS"
+          echo "==================================="
+
+          RUN_ID=$(gh workflow run descargas-sgs.yml --repo ${{ github.repository }} --ref main --json id -q '.id' 2>/dev/null || echo "")
+
+          if [ -z "$RUN_ID" ]; then
+            echo "[*] Disparando workflow descargas-sgs.yml..."
+            RUN_ID=$(gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/descargas-sgs.yml/dispatches \
+              -X POST \
+              -f ref=main \
+              --input /dev/null 2>&1 | grep -o '"id":[0-9]*' | head -1 | cut -d':' -f2)
+          fi
+
+          echo "[*] Esperando a que descargas-sgs.yml se complete..."
+
+          # Esperar con timeout de 30 minutos
+          TIMEOUT=1800
+          ELAPSED=0
+          INTERVAL=30
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            LATEST_RUN=$(gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/descargas-sgs.yml/runs?per_page=1 --jq '.workflow_runs[0]')
+            STATUS=$(echo $LATEST_RUN | jq -r '.status')
+            CONCLUSION=$(echo $LATEST_RUN | jq -r '.conclusion')
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "[+] ✓ DESCARGA COMPLETADA EXITOSAMENTE"
+                break
+              else
+                echo "[!] ✗ DESCARGA FALLÓ (Conclusion: $CONCLUSION)"
+                exit 1
+              fi
+            fi
+
+            echo "[*] Estado: $STATUS | Esperado: 30s más..."
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "[!] ✗ TIMEOUT: Descarga se tardó más de 30 minutos"
+            exit 1
+          fi
+
+      - name: "📈 PASO 2: Transformación de datos"
+        if: ${{ inputs.ejecutar_transformacion == true }}
+        run: |
+          echo "==================================="
+          echo "🔄 Iniciando TRANSFORMACIÓN DE DATOS"
+          echo "==================================="
+
+          gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/transformar.yml/dispatches \
+            -X POST \
+            -f ref=main
+
+          echo "[*] Esperando a que transformar.yml se complete..."
+
+          # Esperar con timeout de 20 minutos
+          TIMEOUT=1200
+          ELAPSED=0
+          INTERVAL=20
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            LATEST_RUN=$(gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/transformar.yml/runs?per_page=1 --jq '.workflow_runs[0]')
+            STATUS=$(echo $LATEST_RUN | jq -r '.status')
+            CONCLUSION=$(echo $LATEST_RUN | jq -r '.conclusion')
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "[+] ✓ TRANSFORMACIÓN COMPLETADA EXITOSAMENTE"
+                break
+              else
+                echo "[!] ✗ TRANSFORMACIÓN FALLÓ (Conclusion: $CONCLUSION)"
+                exit 1
+              fi
+            fi
+
+            echo "[*] Estado: $STATUS | Esperado: 20s más..."
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "[!] ✗ TIMEOUT: Transformación se tardó más de 20 minutos"
+            exit 1
+          fi
+
+      - name: "📚 PASO 3: Enriquecimiento teórico"
+        if: ${{ inputs.ejecutar_enriquecimiento == true }}
+        run: |
+          echo "==================================="
+          echo "🔄 Iniciando ENRIQUECIMIENTO TEÓRICO"
+          echo "==================================="
+
+          gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/enriquecer-consolidado-teoricas.yml/dispatches \
+            -X POST \
+            -f ref=main
+
+          echo "[*] Esperando a que enriquecer-consolidado-teoricas.yml se complete..."
+
+          # Esperar con timeout de 10 minutos
+          TIMEOUT=600
+          ELAPSED=0
+          INTERVAL=15
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            LATEST_RUN=$(gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/enriquecer-consolidado-teoricas.yml/runs?per_page=1 --jq '.workflow_runs[0]')
+            STATUS=$(echo $LATEST_RUN | jq -r '.status')
+            CONCLUSION=$(echo $LATEST_RUN | jq -r '.conclusion')
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "[+] ✓ ENRIQUECIMIENTO COMPLETADO EXITOSAMENTE"
+                break
+              else
+                echo "[!] ✗ ENRIQUECIMIENTO FALLÓ (Conclusion: $CONCLUSION)"
+                exit 1
+              fi
+            fi
+
+            echo "[*] Estado: $STATUS | Esperado: 15s más..."
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "[!] ✗ TIMEOUT: Enriquecimiento se tardó más de 10 minutos"
+            exit 1
+          fi
+
+      - name: "📄 PASO 4: Generación de informe"
+        if: ${{ inputs.ejecutar_informe == true }}
+        run: |
+          echo "==================================="
+          echo "🔄 Iniciando GENERACIÓN DE INFORME"
+          echo "==================================="
+
+          gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/generar-informe.yml/dispatches \
+            -X POST \
+            -f ref=main
+
+          echo "[*] Esperando a que generar-informe.yml se complete..."
+
+          # Esperar con timeout de 5 minutos
+          TIMEOUT=300
+          ELAPSED=0
+          INTERVAL=10
+
+          while [ $ELAPSED -lt $TIMEOUT ]; do
+            LATEST_RUN=$(gh api repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/generar-informe.yml/runs?per_page=1 --jq '.workflow_runs[0]')
+            STATUS=$(echo $LATEST_RUN | jq -r '.status')
+            CONCLUSION=$(echo $LATEST_RUN | jq -r '.conclusion')
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "[+] ✓ INFORME GENERADO EXITOSAMENTE"
+                break
+              else
+                echo "[!] ✗ GENERACIÓN DE INFORME FALLÓ (Conclusion: $CONCLUSION)"
+                exit 1
+              fi
+            fi
+
+            echo "[*] Estado: $STATUS | Esperado: 10s más..."
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          if [ $ELAPSED -ge $TIMEOUT ]; then
+            echo "[!] ✗ TIMEOUT: Generación de informe se tardó más de 5 minutos"
+            exit 1
+          fi
+
+      - name: "✅ RESUMEN FINAL"
+        if: success()
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════╗"
+          echo "║                  🎉 FLUJO COMPLETADO                  ║"
+          echo "╚════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Pasos ejecutados:"
+          [ "${{ inputs.ejecutar_descarga }}" = "true" ] && echo "  ✓ PASO 1: Descarga de datos SGS" || echo "  ⊘ PASO 1: Descarga (omitido)"
+          [ "${{ inputs.ejecutar_transformacion }}" = "true" ] && echo "  ✓ PASO 2: Transformación de datos" || echo "  ⊘ PASO 2: Transformación (omitido)"
+          [ "${{ inputs.ejecutar_enriquecimiento }}" = "true" ] && echo "  ✓ PASO 3: Enriquecimiento teórico" || echo "  ⊘ PASO 3: Enriquecimiento (omitido)"
+          [ "${{ inputs.ejecutar_informe }}" = "true" ] && echo "  ✓ PASO 4: Generación de informe" || echo "  ⊘ PASO 4: Informe (omitido)"
+          echo ""
+          echo "📊 El informe estará disponible en:"
+          echo "   https://github.com/${{ github.repository }}/actions"
+          echo ""
+          echo "🌐 Página web disponible en tu GitHub Pages"
+          echo ""
+
+      - name: "❌ REPORTE DE ERROR"
+        if: failure()
+        run: |
+          echo ""
+          echo "╔════════════════════════════════════════════════════════╗"
+          echo "║            ⚠️  FLUJO INTERRUMPIDO POR ERROR            ║"
+          echo "╚════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "Para más detalles, revisa los logs del workflow individual"
+          echo "que falló en la pestaña Actions."
+          echo ""
+          exit 1
