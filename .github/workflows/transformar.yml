@@ -622,16 +622,17 @@ jobs:
           archivo_origen = "DatosTransformados/ConsolidadoResistenciasConcretos.xlsx"
 
           if not os.path.exists(archivo_origen):
-              print(f'[!] Archivo no encontrado: {archivo_origen}')
-              exit(1)
+              print(f'[*] Archivo no encontrado aún: {archivo_origen} (omitiendo filtrado)')
+              print(f'[*] Este archivo se creará en la próxima ejecución')
+              exit(0)
 
           df = pd.read_excel(archivo_origen)
           print(f'[+] Archivo original cargado. Total registros: {len(df)}')
 
           # Verificar que la columna existe
           if 'Cumplimiento norma b' not in df.columns:
-              print(f'[!] Columna Cumplimiento norma b no encontrada')
-              exit(1)
+              print(f'[!] Columna Cumplimiento norma b no encontrada (aún no enriquecido)')
+              exit(0)
 
           # Filtrar solo registros donde Cumplimiento norma b > 0
           # Convertir a numérico, los "NoValido" serán NaN
